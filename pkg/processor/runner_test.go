@@ -6,14 +6,24 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/umputun/ralphex/pkg/config"
 	"github.com/umputun/ralphex/pkg/executor"
 	"github.com/umputun/ralphex/pkg/processor/mocks"
 	"github.com/umputun/ralphex/pkg/progress"
 )
+
+// testAppConfig loads config with embedded defaults for testing.
+func testAppConfig(t *testing.T) *config.Config {
+	t.Helper()
+	cfg, err := config.Load(t.TempDir())
+	require.NoError(t, err)
+	return cfg
+}
 
 // newMockExecutor creates a mock executor with predefined results.
 func newMockExecutor(results []executor.Result) *mocks.ExecutorMock {
@@ -84,7 +94,8 @@ func TestRunner_RunFull_Success(t *testing.T) {
 		{Output: "found issue in foo.go"}, // codex finds issues
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.NoError(t, err)
@@ -107,7 +118,8 @@ func TestRunner_RunFull_NoCodexFindings(t *testing.T) {
 		{Output: ""}, // codex finds nothing
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.NoError(t, err)
@@ -125,7 +137,8 @@ func TestRunner_RunReviewOnly_Success(t *testing.T) {
 		{Output: "found issue"},
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeReview, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeReview, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.NoError(t, err)
@@ -142,7 +155,8 @@ func TestRunner_RunCodexOnly_Success(t *testing.T) {
 		{Output: "found issue"},
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeCodexOnly, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeCodexOnly, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.NoError(t, err)
@@ -158,10 +172,26 @@ func TestRunner_RunCodexOnly_NoFindings(t *testing.T) {
 		{Output: ""}, // no findings
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeCodexOnly, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeCodexOnly, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.NoError(t, err)
+}
+
+func TestRunner_CodexDisabled_SkipsCodexPhase(t *testing.T) {
+	log := newMockLogger("progress.txt")
+	claude := newMockExecutor([]executor.Result{
+		{Output: "review done", Signal: SignalReviewDone}, // post-codex review loop
+	})
+	codex := newMockExecutor(nil)
+
+	cfg := Config{Mode: ModeCodexOnly, MaxIterations: 50, CodexEnabled: false, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
+	err := r.Run(context.Background())
+
+	require.NoError(t, err)
+	assert.Empty(t, codex.RunCalls(), "codex should not be called when disabled")
 }
 
 func TestRunner_TaskPhase_FailedSignal(t *testing.T) {
@@ -176,7 +206,8 @@ func TestRunner_TaskPhase_FailedSignal(t *testing.T) {
 	})
 	codex := newMockExecutor(nil)
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.Error(t, err)
@@ -196,7 +227,8 @@ func TestRunner_TaskPhase_MaxIterations(t *testing.T) {
 	})
 	codex := newMockExecutor(nil)
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 3}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 3, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.Error(t, err)
@@ -215,7 +247,8 @@ func TestRunner_TaskPhase_ContextCanceled(t *testing.T) {
 	claude := newMockExecutor(nil)
 	codex := newMockExecutor(nil)
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(ctx)
 
 	require.Error(t, err)
@@ -229,7 +262,8 @@ func TestRunner_ClaudeReview_FailedSignal(t *testing.T) {
 	})
 	codex := newMockExecutor(nil)
 
-	r := NewWithExecutors(Config{Mode: ModeReview, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeReview, MaxIterations: 50, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.Error(t, err)
@@ -246,11 +280,13 @@ func TestRunner_CodexPhase_Error(t *testing.T) {
 		{Error: errors.New("codex error")},
 	})
 
-	r := NewWithExecutors(Config{Mode: ModeReview, MaxIterations: 50}, log, claude, codex)
+	cfg := Config{Mode: ModeReview, MaxIterations: 50, CodexEnabled: true, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "codex")
+	assert.Len(t, codex.RunCalls(), 1, "codex should be called once")
 }
 
 func TestRunner_ClaudeExecution_Error(t *testing.T) {
@@ -264,7 +300,8 @@ func TestRunner_ClaudeExecution_Error(t *testing.T) {
 	})
 	codex := newMockExecutor(nil)
 
-	r := NewWithExecutors(Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10}, log, claude, codex)
+	cfg := Config{Mode: ModeFull, PlanFile: planFile, MaxIterations: 10, AppConfig: testAppConfig(t)}
+	r := NewWithExecutors(cfg, log, claude, codex)
 	err := r.Run(context.Background())
 
 	require.Error(t, err)
@@ -294,4 +331,75 @@ func TestRunner_hasUncompletedTasks(t *testing.T) {
 		r := &Runner{cfg: Config{PlanFile: "/nonexistent/file.md"}}
 		assert.True(t, r.hasUncompletedTasks())
 	})
+}
+
+func TestRunner_ConfigValues(t *testing.T) {
+	t.Run("default iteration delay", func(t *testing.T) {
+		log := newMockLogger("")
+		claude := newMockExecutor(nil)
+		codex := newMockExecutor(nil)
+
+		r := NewWithExecutors(Config{}, log, claude, codex)
+		assert.Equal(t, defaultIterationDelay, r.iterationDelay)
+	})
+
+	t.Run("custom iteration delay from config", func(t *testing.T) {
+		log := newMockLogger("")
+		claude := newMockExecutor(nil)
+		codex := newMockExecutor(nil)
+
+		r := NewWithExecutors(Config{IterationDelayMs: 5000}, log, claude, codex)
+		assert.Equal(t, 5*time.Second, r.iterationDelay)
+	})
+
+	t.Run("default task retry count", func(t *testing.T) {
+		log := newMockLogger("")
+		claude := newMockExecutor(nil)
+		codex := newMockExecutor(nil)
+
+		r := NewWithExecutors(Config{}, log, claude, codex)
+		assert.Equal(t, 1, r.taskRetryCount)
+	})
+
+	t.Run("custom task retry count from config", func(t *testing.T) {
+		log := newMockLogger("")
+		claude := newMockExecutor(nil)
+		codex := newMockExecutor(nil)
+
+		r := NewWithExecutors(Config{TaskRetryCount: 3}, log, claude, codex)
+		assert.Equal(t, 3, r.taskRetryCount)
+	})
+}
+
+func TestRunner_TaskRetryCount_UsedCorrectly(t *testing.T) {
+	tmpDir := t.TempDir()
+	planFile := filepath.Join(tmpDir, "plan.md")
+	require.NoError(t, os.WriteFile(planFile, []byte("# Plan\n- [ ] Task 1"), 0o600))
+
+	log := newMockLogger("progress.txt")
+
+	// test with TaskRetryCount=2 - should retry twice before failing
+	claude := newMockExecutor([]executor.Result{
+		{Output: "error", Signal: SignalFailed}, // first try
+		{Output: "error", Signal: SignalFailed}, // retry 1
+		{Output: "error", Signal: SignalFailed}, // retry 2
+	})
+	codex := newMockExecutor(nil)
+
+	cfg := Config{
+		Mode:           ModeFull,
+		PlanFile:       planFile,
+		MaxIterations:  10,
+		TaskRetryCount: 2,
+		// use 1ms delay for faster tests
+		IterationDelayMs: 1,
+		AppConfig:        testAppConfig(t),
+	}
+	r := NewWithExecutors(cfg, log, claude, codex)
+	err := r.Run(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "FAILED signal")
+	// should have tried 3 times: initial + 2 retries
+	assert.Len(t, claude.RunCalls(), 3)
 }

@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-//go:generate moq -out mocks/claude_command_runner.go -pkg mocks -skip-ensure -fmt goimports . ClaudeCommandRunner
+//go:generate moq -out mocks/command_runner.go -pkg mocks -skip-ensure -fmt goimports . CommandRunner
 
 // Result holds execution result with output and detected signal.
 type Result struct {
@@ -21,9 +21,10 @@ type Result struct {
 	Error  error  // execution error if any
 }
 
-// ClaudeCommandRunner abstracts command execution for claude testing.
-type ClaudeCommandRunner interface {
-	Run(ctx context.Context, name string, args ...string) (stdout io.Reader, wait func() error, err error)
+// CommandRunner abstracts command execution for testing.
+// Returns an io.Reader for streaming output and a wait function for completion.
+type CommandRunner interface {
+	Run(ctx context.Context, name string, args ...string) (output io.Reader, wait func() error, err error)
 }
 
 // execClaudeRunner is the default command runner using os/exec.
@@ -45,6 +46,56 @@ func (r *execClaudeRunner) Run(ctx context.Context, name string, args ...string)
 		return nil, nil, fmt.Errorf("start command: %w", err)
 	}
 	return stdout, cmd.Wait, nil
+}
+
+// splitArgs splits a space-separated argument string into a slice.
+// handles quoted strings (both single and double quotes).
+func splitArgs(s string) []string {
+	var args []string
+	var current strings.Builder
+	var inQuote rune
+	var escaped bool
+
+	for _, r := range s {
+		if escaped {
+			current.WriteRune(r)
+			escaped = false
+			continue
+		}
+
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+
+		if r == '"' || r == '\'' {
+			switch { //nolint:staticcheck // cannot use tagged switch because we compare with both inQuote and r
+			case inQuote == 0:
+				inQuote = r
+			case inQuote == r:
+				inQuote = 0
+			default:
+				current.WriteRune(r)
+			}
+			continue
+		}
+
+		if r == ' ' && inQuote == 0 {
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+			continue
+		}
+
+		current.WriteRune(r)
+	}
+
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args
 }
 
 // filterEnv returns a copy of env with specified keys removed.
@@ -87,26 +138,39 @@ type streamEvent struct {
 
 // ClaudeExecutor runs claude CLI commands with streaming JSON parsing.
 type ClaudeExecutor struct {
-	OutputHandler func(text string)   // called for each text chunk, can be nil
-	Debug         bool                // enable debug output
-	cmdRunner     ClaudeCommandRunner // for testing, nil uses default
+	Command       string            // command to execute, defaults to "claude"
+	Args          string            // additional arguments (space-separated), defaults to standard args
+	OutputHandler func(text string) // called for each text chunk, can be nil
+	Debug         bool              // enable debug output
+	cmdRunner     CommandRunner     // for testing, nil uses default
 }
 
 // Run executes claude CLI with the given prompt and parses streaming JSON output.
 func (e *ClaudeExecutor) Run(ctx context.Context, prompt string) Result {
-	args := []string{
-		"--dangerously-skip-permissions",
-		"--output-format", "stream-json",
-		"--verbose",
-		"-p", prompt,
+	cmd := e.Command
+	if cmd == "" {
+		cmd = "claude"
 	}
+
+	// build args from configured string or use defaults
+	var args []string
+	if e.Args != "" {
+		args = splitArgs(e.Args)
+	} else {
+		args = []string{
+			"--dangerously-skip-permissions",
+			"--output-format", "stream-json",
+			"--verbose",
+		}
+	}
+	args = append(args, "-p", prompt)
 
 	runner := e.cmdRunner
 	if runner == nil {
 		runner = &execClaudeRunner{}
 	}
 
-	stdout, wait, err := runner.Run(ctx, "claude", args...)
+	stdout, wait, err := runner.Run(ctx, cmd, args...)
 	if err != nil {
 		return Result{Error: err}
 	}

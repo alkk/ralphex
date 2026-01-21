@@ -5,15 +5,13 @@
 *.so
 *.dylib
 .bin/
+/ralphex
 
 # test files
 *.test
 coverage.out
 coverage_no_mocks.out
 profile.cov
-
-# dependency directories
-vendor/
 
 # ide and editor
 .idea/

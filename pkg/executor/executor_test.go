@@ -16,7 +16,7 @@ import (
 func TestClaudeExecutor_Run_Success(t *testing.T) {
 	jsonStream := `{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello world <<<RALPHEX:ALL_TASKS_DONE>>>"}}`
 
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return strings.NewReader(jsonStream), func() error { return nil }, nil
 		},
@@ -31,7 +31,7 @@ func TestClaudeExecutor_Run_Success(t *testing.T) {
 }
 
 func TestClaudeExecutor_Run_StartError(t *testing.T) {
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return nil, nil, errors.New("command not found")
 		},
@@ -47,7 +47,7 @@ func TestClaudeExecutor_Run_StartError(t *testing.T) {
 func TestClaudeExecutor_Run_WaitError_WithOutput(t *testing.T) {
 	jsonStream := `{"type":"content_block_delta","delta":{"type":"text_delta","text":"partial output"}}`
 
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return strings.NewReader(jsonStream), func() error { return errors.New("exit status 1") }, nil
 		},
@@ -62,7 +62,7 @@ func TestClaudeExecutor_Run_WaitError_WithOutput(t *testing.T) {
 }
 
 func TestClaudeExecutor_Run_WaitError_NoOutput(t *testing.T) {
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return strings.NewReader(""), func() error { return errors.New("exit status 1") }, nil
 		},
@@ -79,7 +79,7 @@ func TestClaudeExecutor_Run_ContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return strings.NewReader(""), func() error { return context.Canceled }, nil
 		},
@@ -96,7 +96,7 @@ func TestClaudeExecutor_Run_WithOutputHandler(t *testing.T) {
 {"type":"content_block_delta","delta":{"type":"text_delta","text":"chunk2"}}`
 
 	var chunks []string
-	mock := &mocks.ClaudeCommandRunnerMock{
+	mock := &mocks.CommandRunnerMock{
 		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
 			return strings.NewReader(jsonStream), func() error { return nil }, nil
 		},
@@ -329,6 +329,97 @@ func TestDetectSignal(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.text, func(t *testing.T) {
 			got := detectSignal(tc.text)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestClaudeExecutor_Run_WithCustomCommand(t *testing.T) {
+	var capturedCmd string
+	var capturedArgs []string
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, name string, args ...string) (io.Reader, func() error, error) {
+			capturedCmd = name
+			capturedArgs = args
+			return strings.NewReader(`{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}`), func() error { return nil }, nil
+		},
+	}
+	e := &ClaudeExecutor{
+		cmdRunner: mock,
+		Command:   "my-claude",
+	}
+
+	result := e.Run(context.Background(), "test prompt")
+
+	require.NoError(t, result.Error)
+	assert.Equal(t, "my-claude", capturedCmd)
+	// should still use default args
+	assert.Contains(t, capturedArgs, "--dangerously-skip-permissions")
+}
+
+func TestClaudeExecutor_Run_WithCustomArgs(t *testing.T) {
+	var capturedArgs []string
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, _ string, args ...string) (io.Reader, func() error, error) {
+			capturedArgs = args
+			return strings.NewReader(`{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}`), func() error { return nil }, nil
+		},
+	}
+	e := &ClaudeExecutor{
+		cmdRunner: mock,
+		Args:      "--custom-arg --another-arg value",
+	}
+
+	result := e.Run(context.Background(), "test prompt")
+
+	require.NoError(t, result.Error)
+	// should use custom args plus prompt args
+	assert.Equal(t, []string{"--custom-arg", "--another-arg", "value", "-p", "test prompt"}, capturedArgs)
+}
+
+func TestClaudeExecutor_Run_WithCustomCommandAndArgs(t *testing.T) {
+	var capturedCmd string
+	var capturedArgs []string
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, name string, args ...string) (io.Reader, func() error, error) {
+			capturedCmd = name
+			capturedArgs = args
+			return strings.NewReader(`{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}`), func() error { return nil }, nil
+		},
+	}
+	e := &ClaudeExecutor{
+		cmdRunner: mock,
+		Command:   "custom-claude",
+		Args:      "--skip-perms --verbose",
+	}
+
+	result := e.Run(context.Background(), "the prompt")
+
+	require.NoError(t, result.Error)
+	assert.Equal(t, "custom-claude", capturedCmd)
+	assert.Equal(t, []string{"--skip-perms", "--verbose", "-p", "the prompt"}, capturedArgs)
+}
+
+func TestSplitArgs(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{name: "simple args", input: "--flag1 --flag2 value", want: []string{"--flag1", "--flag2", "value"}},
+		{name: "double quoted", input: `--flag "value with spaces"`, want: []string{"--flag", "value with spaces"}},
+		{name: "single quoted", input: `--flag 'value with spaces'`, want: []string{"--flag", "value with spaces"}},
+		{name: "empty string", input: "", want: nil},
+		{name: "only spaces", input: "   ", want: nil},
+		{name: "multiple spaces between", input: "arg1   arg2", want: []string{"arg1", "arg2"}},
+		{name: "mixed quotes", input: `--a "b" --c 'd'`, want: []string{"--a", "b", "--c", "d"}},
+		{name: "escaped quote", input: `--flag \"quoted\"`, want: []string{"--flag", `"quoted"`}},
+		{name: "real claude args", input: "--dangerously-skip-permissions --output-format stream-json --verbose", want: []string{"--dangerously-skip-permissions", "--output-format", "stream-json", "--verbose"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := splitArgs(tc.input)
 			assert.Equal(t, tc.want, got)
 		})
 	}

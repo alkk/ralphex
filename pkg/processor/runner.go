@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/umputun/ralphex/pkg/config"
 	"github.com/umputun/ralphex/pkg/executor"
 	"github.com/umputun/ralphex/pkg/progress"
 )
 
-// iterationDelay is the pause between iterations to allow system to settle.
-const iterationDelay = 2 * time.Second
+// defaultIterationDelay is the pause between iterations to allow system to settle.
+const defaultIterationDelay = 2 * time.Second
 
 // Mode represents the execution mode.
 type Mode string
@@ -28,12 +29,16 @@ const (
 
 // Config holds runner configuration.
 type Config struct {
-	PlanFile      string // path to plan file (required for full mode)
-	ProgressPath  string // path to progress file
-	Mode          Mode   // execution mode
-	MaxIterations int    // maximum iterations for task phase
-	Debug         bool   // enable debug output
-	NoColor       bool   // disable color output
+	PlanFile         string         // path to plan file (required for full mode)
+	ProgressPath     string         // path to progress file
+	Mode             Mode           // execution mode
+	MaxIterations    int            // maximum iterations for task phase
+	Debug            bool           // enable debug output
+	NoColor          bool           // disable color output
+	IterationDelayMs int            // delay between iterations in milliseconds
+	TaskRetryCount   int            // number of times to retry failed tasks
+	CodexEnabled     bool           // whether codex review is enabled
+	AppConfig        *config.Config // full application config (for executors and prompts)
 }
 
 //go:generate moq -out mocks/executor.go -pkg mocks -skip-ensure -fmt goimports . Executor
@@ -56,40 +61,70 @@ type Logger interface {
 
 // Runner orchestrates the execution loop.
 type Runner struct {
-	cfg    Config
-	log    Logger
-	claude Executor
-	codex  Executor
+	cfg            Config
+	log            Logger
+	claude         Executor
+	codex          Executor
+	iterationDelay time.Duration
+	taskRetryCount int
 }
 
 // New creates a new Runner with the given configuration.
 func New(cfg Config, log Logger) *Runner {
-	return &Runner{
-		cfg: cfg,
-		log: log,
-		claude: &executor.ClaudeExecutor{
-			OutputHandler: func(text string) {
-				// stream output with timestamps
-				log.PrintAligned(text)
-			},
-			Debug: cfg.Debug,
+	// build claude executor with config values
+	claudeExec := &executor.ClaudeExecutor{
+		OutputHandler: func(text string) {
+			log.PrintAligned(text)
 		},
-		codex: &executor.CodexExecutor{
-			OutputHandler: func(text string) {
-				log.PrintAligned(text)
-			},
-			Debug: cfg.Debug,
-		},
+		Debug: cfg.Debug,
 	}
+	if cfg.AppConfig != nil {
+		claudeExec.Command = cfg.AppConfig.ClaudeCommand
+		claudeExec.Args = cfg.AppConfig.ClaudeArgs
+	}
+
+	// build codex executor with config values
+	codexExec := &executor.CodexExecutor{
+		OutputHandler: func(text string) {
+			log.PrintAligned(text)
+		},
+		Debug: cfg.Debug,
+	}
+	if cfg.AppConfig != nil {
+		codexExec.Command = cfg.AppConfig.CodexCommand
+		codexExec.Model = cfg.AppConfig.CodexModel
+		codexExec.ReasoningEffort = cfg.AppConfig.CodexReasoningEffort
+		codexExec.TimeoutMs = cfg.AppConfig.CodexTimeoutMs
+		codexExec.Sandbox = cfg.AppConfig.CodexSandbox
+	}
+
+	return NewWithExecutors(cfg, log, claudeExec, codexExec)
 }
 
 // NewWithExecutors creates a new Runner with custom executors (for testing).
 func NewWithExecutors(cfg Config, log Logger, claude, codex Executor) *Runner {
+	// determine iteration delay from config or default
+	iterDelay := defaultIterationDelay
+	if cfg.IterationDelayMs > 0 {
+		iterDelay = time.Duration(cfg.IterationDelayMs) * time.Millisecond
+	}
+
+	// determine task retry count from config
+	// appConfig.TaskRetryCountSet means user explicitly set it (even to 0 for no retries)
+	retryCount := 1
+	if cfg.AppConfig != nil && cfg.AppConfig.TaskRetryCountSet {
+		retryCount = cfg.TaskRetryCount
+	} else if cfg.TaskRetryCount > 0 {
+		retryCount = cfg.TaskRetryCount
+	}
+
 	return &Runner{
-		cfg:    cfg,
-		log:    log,
-		claude: claude,
-		codex:  codex,
+		cfg:            cfg,
+		log:            log,
+		claude:         claude,
+		codex:          codex,
+		iterationDelay: iterDelay,
+		taskRetryCount: retryCount,
 	}
 }
 
@@ -240,10 +275,10 @@ func (r *Runner) runTaskPhase(ctx context.Context) error {
 		}
 
 		if result.Signal == SignalFailed {
-			if retryCount < 1 {
+			if retryCount < r.taskRetryCount {
 				r.log.Print("task failed, retrying...")
 				retryCount++
-				time.Sleep(iterationDelay)
+				time.Sleep(r.iterationDelay)
 				continue
 			}
 			return errors.New("task execution failed after retry (FAILED signal received)")
@@ -251,7 +286,7 @@ func (r *Runner) runTaskPhase(ctx context.Context) error {
 
 		retryCount = 0
 		// continue with same prompt - it reads from plan file each time
-		time.Sleep(iterationDelay)
+		time.Sleep(r.iterationDelay)
 	}
 
 	return fmt.Errorf("max iterations (%d) reached without completion", r.cfg.MaxIterations)
@@ -304,7 +339,7 @@ func (r *Runner) runClaudeReviewLoop(ctx context.Context) error {
 		}
 
 		r.log.Print("issues fixed, running another review iteration...")
-		time.Sleep(iterationDelay)
+		time.Sleep(r.iterationDelay)
 	}
 
 	r.log.Print("max claude review iterations reached, continuing...")
@@ -313,6 +348,12 @@ func (r *Runner) runClaudeReviewLoop(ctx context.Context) error {
 
 // runCodexLoop runs the codex-claude review loop until no findings.
 func (r *Runner) runCodexLoop(ctx context.Context) error {
+	// skip codex phase if disabled
+	if !r.cfg.CodexEnabled {
+		r.log.Print("codex review disabled, skipping...")
+		return nil
+	}
+
 	// codex iterations = 20% of max_iterations (min 3)
 	maxCodexIterations := max(3, r.cfg.MaxIterations/5)
 
@@ -352,7 +393,7 @@ func (r *Runner) runCodexLoop(ctx context.Context) error {
 			return nil
 		}
 
-		time.Sleep(iterationDelay)
+		time.Sleep(r.iterationDelay)
 	}
 
 	r.log.Print("max codex iterations reached, continuing to next phase...")

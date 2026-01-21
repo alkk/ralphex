@@ -5,27 +5,28 @@ package mocks
 
 import (
 	"context"
+	"io"
 	"sync"
 )
 
-// CodexCommandRunnerMock is a mock implementation of executor.CodexCommandRunner.
+// CommandRunnerMock is a mock implementation of executor.CommandRunner.
 //
-//	func TestSomethingThatUsesCodexCommandRunner(t *testing.T) {
+//	func TestSomethingThatUsesCommandRunner(t *testing.T) {
 //
-//		// make and configure a mocked executor.CodexCommandRunner
-//		mockedCodexCommandRunner := &CodexCommandRunnerMock{
-//			RunFunc: func(ctx context.Context, name string, args ...string) (string, string, error) {
+//		// make and configure a mocked executor.CommandRunner
+//		mockedCommandRunner := &CommandRunnerMock{
+//			RunFunc: func(ctx context.Context, name string, args ...string) (io.Reader, func() error, error) {
 //				panic("mock out the Run method")
 //			},
 //		}
 //
-//		// use mockedCodexCommandRunner in code that requires executor.CodexCommandRunner
+//		// use mockedCommandRunner in code that requires executor.CommandRunner
 //		// and then make assertions.
 //
 //	}
-type CodexCommandRunnerMock struct {
+type CommandRunnerMock struct {
 	// RunFunc mocks the Run method.
-	RunFunc func(ctx context.Context, name string, args ...string) (string, string, error)
+	RunFunc func(ctx context.Context, name string, args ...string) (io.Reader, func() error, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -43,9 +44,9 @@ type CodexCommandRunnerMock struct {
 }
 
 // Run calls RunFunc.
-func (mock *CodexCommandRunnerMock) Run(ctx context.Context, name string, args ...string) (string, string, error) {
+func (mock *CommandRunnerMock) Run(ctx context.Context, name string, args ...string) (io.Reader, func() error, error) {
 	if mock.RunFunc == nil {
-		panic("CodexCommandRunnerMock.RunFunc: method is nil but CodexCommandRunner.Run was just called")
+		panic("CommandRunnerMock.RunFunc: method is nil but CommandRunner.Run was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
@@ -65,8 +66,8 @@ func (mock *CodexCommandRunnerMock) Run(ctx context.Context, name string, args .
 // RunCalls gets all the calls that were made to Run.
 // Check the length with:
 //
-//	len(mockedCodexCommandRunner.RunCalls())
-func (mock *CodexCommandRunnerMock) RunCalls() []struct {
+//	len(mockedCommandRunner.RunCalls())
+func (mock *CommandRunnerMock) RunCalls() []struct {
 	Ctx  context.Context
 	Name string
 	Args []string

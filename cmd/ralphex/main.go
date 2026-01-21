@@ -16,6 +16,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
 
+	"github.com/umputun/ralphex/pkg/config"
+	"github.com/umputun/ralphex/pkg/git"
 	"github.com/umputun/ralphex/pkg/processor"
 	"github.com/umputun/ralphex/pkg/progress"
 )
@@ -35,8 +37,6 @@ type opts struct {
 }
 
 var revision = "unknown"
-
-const plansDir = "docs/plans"
 
 func main() {
 	fmt.Printf("ralphex %s\n", revision)
@@ -70,47 +70,51 @@ func main() {
 }
 
 func run(ctx context.Context, o opts) error {
-	if err := checkDependencies("claude", "git"); err != nil {
-		return err
+	// load config first to get custom command paths
+	cfg, err := config.Load("") // empty string uses default location
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
 	}
 
-	// select plan file
-	planFile, err := selectPlan(ctx, o.PlanFile, o.Review || o.CodexOnly)
+	// check dependencies using configured command (or default "claude")
+	if depErr := checkClaudeDep(cfg); depErr != nil {
+		return depErr
+	}
+
+	// require running from repo root
+	if _, statErr := os.Stat(".git"); statErr != nil {
+		return errors.New("must run from repository root (no .git directory found)")
+	}
+
+	// open git repository
+	gitOps, err := git.Open(".")
+	if err != nil {
+		return fmt.Errorf("open git repo: %w", err)
+	}
+
+	// select and prepare plan file
+	skipTasks := o.Review || o.CodexOnly
+	planFile, err := preparePlanFile(ctx, o.PlanFile, skipTasks, cfg.PlansDir)
 	if err != nil {
 		return err
 	}
 
-	skipTasks := o.Review || o.CodexOnly
-	if planFile == "" && !skipTasks {
-		return errors.New("plan file required for task execution")
-	}
-
 	// create branch if on main/master
 	if planFile != "" {
-		if branchErr := createBranchIfNeeded(ctx, planFile); branchErr != nil {
+		if branchErr := createBranchIfNeeded(gitOps, planFile); branchErr != nil {
 			return branchErr
 		}
 	}
 
 	// ensure progress files are gitignored
-	if gitErr := ensureGitignore(ctx); gitErr != nil {
+	if gitErr := ensureGitignore(gitOps); gitErr != nil {
 		return gitErr
 	}
 
-	// determine mode
-	var mode processor.Mode
-	switch {
-	case o.CodexOnly:
-		mode = processor.ModeCodexOnly
-	case o.Review:
-		mode = processor.ModeReview
-	default:
-		mode = processor.ModeFull
-	}
+	mode := determineMode(o)
 
 	// get current branch for logging
-	out, err := exec.CommandContext(ctx, "git", "branch", "--show-current").Output()
-	branch := strings.TrimSpace(string(out))
+	branch, err := gitOps.CurrentBranch()
 	if err != nil || branch == "" {
 		branch = "unknown"
 	}
@@ -131,21 +135,14 @@ func run(ctx context.Context, o opts) error {
 	printStartupInfo(planFile, branch, mode, o.MaxIterations, log.Path())
 
 	// create and run the runner
-	r := processor.New(processor.Config{
-		PlanFile:      planFile,
-		Mode:          mode,
-		MaxIterations: o.MaxIterations,
-		Debug:         o.Debug,
-		NoColor:       o.NoColor,
-	}, log)
-
-	if err := r.Run(ctx); err != nil {
-		return fmt.Errorf("runner: %w", err)
+	r := createRunner(cfg, o, planFile, mode, log)
+	if runErr := r.Run(ctx); runErr != nil {
+		return fmt.Errorf("runner: %w", runErr)
 	}
 
 	// move completed plan to completed/ directory
 	if planFile != "" && mode == processor.ModeFull {
-		if moveErr := movePlanToCompleted(ctx, planFile); moveErr != nil {
+		if moveErr := movePlanToCompleted(gitOps, planFile); moveErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to move plan to completed: %v\n", moveErr)
 		}
 	}
@@ -154,7 +151,67 @@ func run(ctx context.Context, o opts) error {
 	return nil
 }
 
-func selectPlan(ctx context.Context, planFile string, optional bool) (string, error) {
+// checkClaudeDep checks that the claude command is available in PATH.
+func checkClaudeDep(cfg *config.Config) error {
+	claudeCmd := cfg.ClaudeCommand
+	if claudeCmd == "" {
+		claudeCmd = "claude"
+	}
+	return checkDependencies(claudeCmd)
+}
+
+// determineMode returns the execution mode based on CLI flags.
+func determineMode(o opts) processor.Mode {
+	switch {
+	case o.CodexOnly:
+		return processor.ModeCodexOnly
+	case o.Review:
+		return processor.ModeReview
+	default:
+		return processor.ModeFull
+	}
+}
+
+// createRunner creates a processor.Runner with the given configuration.
+func createRunner(cfg *config.Config, o opts, planFile string, mode processor.Mode, log *progress.Logger) *processor.Runner {
+	// --codex-only mode forces codex enabled regardless of config
+	codexEnabled := cfg.CodexEnabled
+	if mode == processor.ModeCodexOnly {
+		codexEnabled = true
+	}
+	return processor.New(processor.Config{
+		PlanFile:         planFile,
+		Mode:             mode,
+		MaxIterations:    o.MaxIterations,
+		Debug:            o.Debug,
+		NoColor:          o.NoColor,
+		IterationDelayMs: cfg.IterationDelayMs,
+		TaskRetryCount:   cfg.TaskRetryCount,
+		CodexEnabled:     codexEnabled,
+		AppConfig:        cfg,
+	}, log)
+}
+
+func preparePlanFile(ctx context.Context, planFile string, skipTasks bool, plansDir string) (string, error) {
+	selected, err := selectPlan(ctx, planFile, skipTasks, plansDir)
+	if err != nil {
+		return "", err
+	}
+	if selected == "" {
+		if !skipTasks {
+			return "", errors.New("plan file required for task execution")
+		}
+		return "", nil
+	}
+	// normalize to absolute path
+	abs, err := filepath.Abs(selected)
+	if err != nil {
+		return "", fmt.Errorf("resolve plan path: %w", err)
+	}
+	return abs, nil
+}
+
+func selectPlan(ctx context.Context, planFile string, optional bool, plansDir string) (string, error) {
 	if planFile != "" {
 		if _, err := os.Stat(planFile); err != nil {
 			return "", fmt.Errorf("plan file not found: %s", planFile)
@@ -168,10 +225,10 @@ func selectPlan(ctx context.Context, planFile string, optional bool) (string, er
 	}
 
 	// use fzf to select plan
-	return selectPlanWithFzf(ctx)
+	return selectPlanWithFzf(ctx, plansDir)
 }
 
-func selectPlanWithFzf(ctx context.Context) (string, error) {
+func selectPlanWithFzf(ctx context.Context, plansDir string) (string, error) {
 	if _, err := os.Stat(plansDir); err != nil {
 		return "", fmt.Errorf("plans directory not found: %s", plansDir)
 	}
@@ -209,14 +266,13 @@ func selectPlanWithFzf(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func createBranchIfNeeded(ctx context.Context, planFile string) error {
+func createBranchIfNeeded(gitOps *git.Repo, planFile string) error {
 	// get current branch
-	out, err := exec.CommandContext(ctx, "git", "branch", "--show-current").Output()
+	currentBranch, err := gitOps.CurrentBranch()
 	if err != nil {
 		return fmt.Errorf("get current branch: %w", err)
 	}
 
-	currentBranch := strings.TrimSpace(string(out))
 	if currentBranch != "main" && currentBranch != "master" {
 		return nil // already on feature branch
 	}
@@ -230,15 +286,24 @@ func createBranchIfNeeded(ctx context.Context, planFile string) error {
 		branchName = name
 	}
 
+	// check if branch already exists
+	if gitOps.BranchExists(branchName) {
+		infoColor.Printf("switching to existing branch: %s\n", branchName)
+		if err := gitOps.CheckoutBranch(branchName); err != nil {
+			return fmt.Errorf("checkout branch %s: %w", branchName, err)
+		}
+		return nil
+	}
+
 	infoColor.Printf("creating branch: %s\n", branchName)
-	if err := exec.CommandContext(ctx, "git", "checkout", "-b", branchName).Run(); err != nil { //nolint:gosec // branch name from plan filename
+	if err := gitOps.CreateBranch(branchName); err != nil {
 		return fmt.Errorf("create branch %s: %w", branchName, err)
 	}
 
 	return nil
 }
 
-func movePlanToCompleted(ctx context.Context, planFile string) error {
+func movePlanToCompleted(gitOps *git.Repo, planFile string) error {
 	// create completed directory
 	completedDir := filepath.Join(filepath.Dir(planFile), "completed")
 	if err := os.MkdirAll(completedDir, 0o750); err != nil {
@@ -248,19 +313,21 @@ func movePlanToCompleted(ctx context.Context, planFile string) error {
 	// destination path
 	destPath := filepath.Join(completedDir, filepath.Base(planFile))
 
-	// use git mv if in a git repo, otherwise regular move
-	if err := exec.CommandContext(ctx, "git", "mv", planFile, destPath).Run(); err != nil { //nolint:gosec // paths from CLI
-		// fallback to regular move
+	// use git mv
+	if err := gitOps.MoveFile(planFile, destPath); err != nil {
+		// fallback to regular move for untracked files
 		if renameErr := os.Rename(planFile, destPath); renameErr != nil {
 			return fmt.Errorf("move plan: %w", renameErr)
 		}
-		// add to git if possible
-		_ = exec.CommandContext(ctx, "git", "add", destPath).Run() //nolint:gosec // destPath derived from planFile
+		// stage the new location - log if fails but continue
+		if addErr := gitOps.Add(destPath); addErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to stage moved plan: %v\n", addErr)
+		}
 	}
 
 	// commit the move
 	commitMsg := "move completed plan: " + filepath.Base(planFile)
-	if err := exec.CommandContext(ctx, "git", "commit", "-m", commitMsg).Run(); err != nil { //nolint:gosec // msg from filename
+	if err := gitOps.Commit(commitMsg); err != nil {
 		return fmt.Errorf("commit plan move: %w", err)
 	}
 
@@ -268,21 +335,27 @@ func movePlanToCompleted(ctx context.Context, planFile string) error {
 	return nil
 }
 
-func ensureGitignore(ctx context.Context) error {
+func ensureGitignore(gitOps *git.Repo) error {
 	// check if already ignored
-	if err := exec.CommandContext(ctx, "git", "check-ignore", "-q", "progress-test.txt").Run(); err == nil {
+	ignored, err := gitOps.IsIgnored("progress-test.txt")
+	if err == nil && ignored {
 		return nil // already ignored
 	}
 
-	// add to .gitignore
-	f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // .gitignore needs world-readable
+	// write to .gitignore at repo root (not CWD)
+	gitignorePath := filepath.Join(gitOps.Root(), ".gitignore")
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // .gitignore needs world-readable
 	if err != nil {
 		return fmt.Errorf("open .gitignore: %w", err)
 	}
-	defer f.Close()
 
 	if _, err := f.WriteString("\n# ralphex progress logs\nprogress-*.txt\n"); err != nil {
+		f.Close()
 		return fmt.Errorf("write .gitignore: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close .gitignore: %w", err)
 	}
 
 	infoColor.Println("added progress-*.txt to .gitignore")
