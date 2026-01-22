@@ -2,6 +2,10 @@
 
 Autonomous plan execution with Claude Code - Go rewrite of ralph.py.
 
+## LLM Documentation
+
+See @llms.txt for usage instructions and Claude Code integration commands.
+
 ## Build Commands
 
 ```bash
