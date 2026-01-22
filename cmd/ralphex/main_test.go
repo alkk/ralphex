@@ -109,12 +109,10 @@ func TestCreateRunner(t *testing.T) {
 		o := opts{MaxIterations: 100, Debug: true, NoColor: true}
 
 		// create a dummy logger for the test
-		tmpDir := t.TempDir()
 		colors := testColors()
 		log, err := progress.NewLogger(progress.Config{PlanFile: "", Mode: "full", Branch: "test", NoColor: true}, colors)
 		require.NoError(t, err)
 		defer log.Close()
-		_ = tmpDir // suppress unused
 
 		runner := createRunner(cfg, o, "/path/to/plan.md", processor.ModeFull, log)
 		assert.NotNil(t, runner)
@@ -494,7 +492,7 @@ func TestEnsureGitignore(t *testing.T) {
 		// verify .gitignore was created with the pattern
 		content, err := os.ReadFile(filepath.Join(dir, ".gitignore")) //nolint:gosec // test file in temp dir
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "progress-*.txt")
+		assert.Contains(t, string(content), "progress*.txt")
 	})
 
 	t.Run("skips_when_already_ignored", func(t *testing.T) {
@@ -502,7 +500,7 @@ func TestEnsureGitignore(t *testing.T) {
 
 		// create gitignore with pattern already present
 		gitignore := filepath.Join(dir, ".gitignore")
-		err := os.WriteFile(gitignore, []byte("progress-*.txt\n"), 0o600)
+		err := os.WriteFile(gitignore, []byte("progress*.txt\n"), 0o600)
 		require.NoError(t, err)
 
 		repo, err := git.Open(dir)
@@ -523,7 +521,7 @@ func TestEnsureGitignore(t *testing.T) {
 		// verify content unchanged (no duplicate pattern)
 		content, err := os.ReadFile(gitignore) //nolint:gosec // test file in temp dir
 		require.NoError(t, err)
-		assert.Equal(t, "progress-*.txt\n", string(content))
+		assert.Equal(t, "progress*.txt\n", string(content))
 	})
 
 	t.Run("creates_gitignore_if_missing", func(t *testing.T) {
@@ -555,7 +553,7 @@ func TestEnsureGitignore(t *testing.T) {
 		// verify content
 		content, err := os.ReadFile(gitignore) //nolint:gosec // test file in temp dir
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "progress-*.txt")
+		assert.Contains(t, string(content), "progress*.txt")
 	})
 }
 

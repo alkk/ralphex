@@ -71,7 +71,7 @@ docs/plans/         # plan files location
 **Customization:**
 - Edit files in `~/.config/ralphex/agents/` to modify agent prompts
 - Add new `.txt` files to create custom agents
-- Delete files and restart ralphex to restore defaults
+- Delete ALL `.txt` files from the directory and restart ralphex to restore defaults
 - Built-in Claude Code agents (like `qa-expert`, `go-smells-expert`) can be referenced directly in prompts
 
 ## Testing

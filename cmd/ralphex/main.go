@@ -363,7 +363,7 @@ func ensureGitignore(gitOps *git.Repo, colors *progress.Colors) error {
 		return fmt.Errorf("open .gitignore: %w", err)
 	}
 
-	if _, err := f.WriteString("\n# ralphex progress logs\nprogress-*.txt\n"); err != nil {
+	if _, err := f.WriteString("\n# ralphex progress logs\nprogress*.txt\n"); err != nil {
 		f.Close()
 		return fmt.Errorf("write .gitignore: %w", err)
 	}
@@ -372,7 +372,7 @@ func ensureGitignore(gitOps *git.Repo, colors *progress.Colors) error {
 		return fmt.Errorf("close .gitignore: %w", err)
 	}
 
-	colors.Info().Println("added progress-*.txt to .gitignore")
+	colors.Info().Println("added progress*.txt to .gitignore")
 	return nil
 }
 
