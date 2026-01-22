@@ -1,13 +1,11 @@
-<h1 align="center">ralphex</h1>
+<p align="center">
+  <img src="assets/ralphex-wordmark-split.png" alt="ralphex" width="400">
+</p>
 
 <p align="center">
   <a href="https://github.com/umputun/ralphex/actions/workflows/ci.yml"><img src="https://github.com/umputun/ralphex/actions/workflows/ci.yml/badge.svg" alt="build"></a>
   <a href="https://coveralls.io/github/umputun/ralphex?branch=master"><img src="https://coveralls.io/repos/github/umputun/ralphex/badge.svg?branch=master" alt="Coverage Status"></a>
-  <a href="https://goreportcard.com/report/github.com/umputun/ralphex"><img src="https://goreportcard.com/badge/github.com/umputun/ralphex" alt="Go Report Card"></a>
-</p>
-
-<p align="center">
-  <img src="assets/ralphex-icon-transparent.png" alt="ralphex logo" width="180">
+  <a href="https://goreportcard.com/report/github.com/umputun/ralphex"><img src="https://goreportcard.com/badge/github.com/umputun/ralphex?v=2" alt="Go Report Card"></a>
 </p>
 
 <h2 align="center">Autonomous plan execution with Claude Code</h2>
