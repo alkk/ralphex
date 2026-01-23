@@ -152,6 +152,23 @@ func TestAgentLoader_Load_StripsCommentsFromAgentFiles(t *testing.T) {
 	assert.Equal(t, "check for SQL injection\ncheck for XSS", agents[0].Prompt)
 }
 
+func TestAgentLoader_Load_HandlesCRLFLineEndings(t *testing.T) {
+	tmpDir := t.TempDir()
+	agentsDir := filepath.Join(tmpDir, "agents")
+	require.NoError(t, os.MkdirAll(agentsDir, 0o700))
+
+	// content with CRLF line endings (Windows-style)
+	content := "# comment line\r\ncheck for issues\r\n# another comment\r\nalso check this"
+	require.NoError(t, os.WriteFile(filepath.Join(agentsDir, "security.txt"), []byte(content), 0o600))
+
+	loader := newAgentLoader()
+	agents, err := loader.Load("", agentsDir)
+	require.NoError(t, err)
+
+	require.Len(t, agents, 1)
+	assert.Equal(t, "check for issues\nalso check this", agents[0].Prompt)
+}
+
 func TestAgentLoader_Load_LocalAgentsReplaceGlobal(t *testing.T) {
 	tmpDir := t.TempDir()
 	globalDir := filepath.Join(tmpDir, "global", "agents")
