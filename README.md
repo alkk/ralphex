@@ -389,6 +389,10 @@ Priority: CLI flags > local `.ralphex/config` > global `~/.config/ralphex/config
 
 Ralphex commits after each completed task. If execution fails, completed tasks are already committed to the feature branch. Uncommitted changes from the failed task remain in the working directory for manual inspection.
 
+**What if ralphex is interrupted mid-execution?**
+
+Completed tasks are already committed to the feature branch. To resume, re-run `ralphex docs/plans/<plan>.md`. Ralphex detects completed tasks via `[x]` checkboxes in the plan and continues from the first incomplete task. For review sessions, simply restart. Reviews re-run from iteration 1, but fixes from previous iterations remain in the codebase.
+
 **What's the difference between progress file and plan file?**
 
 Progress file (`progress-*.txt`) is a real-time execution log—tail it to monitor. Plan file tracks task state (`[ ]` vs `[x]`). To resume, re-run ralphex on the plan file; it finds incomplete tasks automatically.
