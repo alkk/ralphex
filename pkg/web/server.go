@@ -316,7 +316,7 @@ func (s *Server) getSession(r *http.Request) (*Session, error) {
 type SessionInfo struct {
 	ID    string       `json:"id"`
 	State SessionState `json:"state"`
-	// Dir is the short display name for the project (last path segment of session directory).
+	// dir is the short display name for the project (last path segment of session directory).
 	Dir string `json:"dir"`
 	// DirPath is the full filesystem path to the session directory (used for grouping and copy-to-clipboard).
 	DirPath      string    `json:"dirPath,omitempty"`

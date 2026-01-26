@@ -401,6 +401,9 @@ func ParseProgressHeader(path string) (SessionMetadata, error) {
 
 	var meta SessionMetadata
 	scanner := bufio.NewScanner(f)
+	// increase buffer size for large lines (16MB max, matching executor)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 16*1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -443,6 +446,9 @@ func loadProgressFileIntoSession(path string, session *Session) {
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
+	// increase buffer size for large lines (16MB max, matching executor)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 16*1024*1024)
 	inHeader := true
 	phase := processor.PhaseTask
 	var pendingSection string // section header waiting for first timestamped event

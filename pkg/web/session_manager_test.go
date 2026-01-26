@@ -746,3 +746,62 @@ Started: 2026-01-22 10:00:00
 `
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 }
+
+func TestParseProgressHeaderLargeBuffer(t *testing.T) {
+	// test that lines larger than 64KB (default bufio.Scanner limit) are handled
+	t.Run("handles lines larger than default scanner buffer", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "progress-large.txt")
+
+		// create a line larger than 64KB (default scanner limit)
+		largeLine := strings.Repeat("x", 100*1024) // 100KB
+
+		content := `# Ralphex Progress Log
+Plan: docs/plans/my-plan.md
+Branch: feature-branch
+Mode: full
+Started: 2026-01-22 10:30:00
+------------------------------------------------------------
+
+[26-01-22 10:30:05] ` + largeLine + `
+`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		meta, err := ParseProgressHeader(path)
+		require.NoError(t, err)
+
+		assert.Equal(t, "docs/plans/my-plan.md", meta.PlanPath)
+		assert.Equal(t, "feature-branch", meta.Branch)
+	})
+}
+
+func TestLoadProgressFileIntoSessionLargeBuffer(t *testing.T) {
+	// test that lines larger than 64KB (default bufio.Scanner limit) are handled
+	t.Run("handles lines larger than default scanner buffer", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "progress-large.txt")
+
+		// create a line larger than 64KB (default scanner limit)
+		largeLine := strings.Repeat("x", 100*1024) // 100KB
+
+		content := `# Ralphex Progress Log
+Plan: docs/plan.md
+Branch: main
+Mode: full
+Started: 2026-01-22 10:00:00
+------------------------------------------------------------
+
+--- Task 1 ---
+[26-01-22 10:00:01] starting task
+[26-01-22 10:00:02] ` + largeLine + `
+[26-01-22 10:00:03] task completed
+`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		session := NewSession("test-large", path)
+		defer session.Close()
+
+		// should not panic or error with "token too long"
+		loadProgressFileIntoSession(path, session)
+	})
+}
