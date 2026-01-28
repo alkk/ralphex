@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.0 - 2026-01-28
+
+### Added
+
+- `--reset` flag for interactive config restoration (#37)
+- Plan validation step to make_plan.txt prompt
+
 ## v0.4.4 - 2026-01-27
 
 ### Fixed
