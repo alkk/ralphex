@@ -407,6 +407,51 @@ func TestRunner_HasUncompletedTasks(t *testing.T) {
 	}
 }
 
+func TestRunner_HasUncompletedTasks_CompletedDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	plansDir := filepath.Join(tmpDir, "docs", "plans")
+	completedDir := filepath.Join(plansDir, "completed")
+	require.NoError(t, os.MkdirAll(completedDir, 0o700))
+
+	// file is in completed/, but config references original path
+	originalPath := filepath.Join(plansDir, "plan.md")
+	completedPath := filepath.Join(completedDir, "plan.md")
+	require.NoError(t, os.WriteFile(completedPath, []byte("# Plan\n- [ ] Task 1"), 0o600))
+
+	log := newMockLogger("")
+	claude := newMockExecutor(nil)
+	codex := newMockExecutor(nil)
+
+	cfg := processor.Config{PlanFile: originalPath}
+	r := processor.NewWithExecutors(cfg, log, claude, codex)
+
+	assert.True(t, r.TestHasUncompletedTasks())
+}
+
+func TestRunner_BuildCodexPrompt_CompletedDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	plansDir := filepath.Join(tmpDir, "docs", "plans")
+	completedDir := filepath.Join(plansDir, "completed")
+	require.NoError(t, os.MkdirAll(completedDir, 0o700))
+
+	// file is in completed/, but config references original path
+	originalPath := filepath.Join(plansDir, "plan.md")
+	completedPath := filepath.Join(completedDir, "plan.md")
+	require.NoError(t, os.WriteFile(completedPath, []byte("# Plan"), 0o600))
+
+	log := newMockLogger("")
+	claude := newMockExecutor(nil)
+	codex := newMockExecutor(nil)
+
+	cfg := processor.Config{PlanFile: originalPath}
+	r := processor.NewWithExecutors(cfg, log, claude, codex)
+
+	prompt := r.TestBuildCodexPrompt(true, "")
+
+	assert.Contains(t, prompt, completedPath)
+	assert.NotContains(t, prompt, originalPath)
+}
+
 func TestRunner_TaskRetryCount_UsedCorrectly(t *testing.T) {
 	tmpDir := t.TempDir()
 	planFile := filepath.Join(tmpDir, "plan.md")
@@ -768,7 +813,7 @@ func TestRunner_ErrorPatternMatch_CodexInReviewPhase(t *testing.T) {
 func TestRunner_ErrorPatternMatch_ClaudeInReviewLoop(t *testing.T) {
 	log := newMockLogger("progress.txt")
 	claude := newMockExecutor([]executor.Result{
-		{Output: "review done", Signal: processor.SignalReviewDone}, // first review
+		{Output: "review done", Signal: processor.SignalReviewDone},                                                     // first review
 		{Output: "rate limited", Error: &executor.PatternMatchError{Pattern: "rate limited", HelpCmd: "claude /usage"}}, // review loop hits rate limit
 	})
 	codex := newMockExecutor(nil)
