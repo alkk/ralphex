@@ -195,7 +195,7 @@ ralphex
 # review-only mode (skip task execution)
 ralphex --review docs/plans/feature.md
 
-# codex-only mode (skip tasks and first claude review)
+# codex-only mode (skip tasks and first claude review, still uses claude to evaluate/fix)
 ralphex --codex-only
 
 # interactive plan creation
@@ -217,7 +217,7 @@ ralphex --serve --port 3000 docs/plans/feature.md
 |------|-------------|---------|
 | `-m, --max-iterations` | Maximum task iterations | 50 |
 | `-r, --review` | Skip task execution, run full review pipeline | false |
-| `-c, --codex-only` | Skip tasks and first review, run only codex loop | false |
+| `-c, --codex-only` | Skip tasks and first review, run codex → claude evaluation → fixes | false |
 | `--plan` | Create plan interactively (provide description) | - |
 | `-s, --serve` | Start web dashboard for real-time streaming | false |
 | `-p, --port` | Web dashboard port (used with `--serve`) | 8080 |
