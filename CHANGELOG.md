@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.7.0 - 2026-02-02
+
+### Added
+
+- `--tasks-only` mode for running tasks without review phases (#58)
+- Docker support for isolated execution (#54)
+- Dashboard e2e tests with Playwright (#25) @melonamin
+
+### Changed
+
+- E2E tests now manual-only (workflow_dispatch)
+- Bump github.com/go-git/go-billy/v5 from 5.6.2 to 5.7.0 (#55)
+
+### Fixed
+
+- Docker ghcr.io authentication in CI workflow
+
 ## v0.6.0 - 2026-01-29
 
 ### Added
