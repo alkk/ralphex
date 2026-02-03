@@ -1,5 +1,6 @@
 # Go development image extending base ralphex
-FROM ghcr.io/umputun/ralphex:latest
+ARG BASE_TAG=latest
+FROM ghcr.io/umputun/ralphex:${BASE_TAG}
 
 LABEL org.opencontainers.image.description="Autonomous plan execution with Claude Code - Go development"
 
