@@ -36,6 +36,9 @@ RUN apk add --no-cache \
 # set env for claude code on alpine (use system ripgrep)
 ENV USE_BUILTIN_RIPGREP=0
 
+# mark container environment for ralphex (used to auto-disable codex sandbox)
+ENV RALPHEX_DOCKER=1
+
 # install claude code and codex globally, verify CLI commands exist
 RUN npm install -g @anthropic-ai/claude-code @openai/codex && \
     command -v claude >/dev/null || { echo "error: claude CLI not found"; exit 1; } && \

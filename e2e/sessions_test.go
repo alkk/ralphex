@@ -298,6 +298,6 @@ func TestSessionSwitchingUpdatesHeader(t *testing.T) {
 	newPlan, err := planName.TextContent()
 	require.NoError(t, err)
 
-	// Log what we found - the test passes if we got this far without errors
+	// log what we found - the test passes if we got this far without errors
 	t.Logf("Initial plan: %s, New plan: %s", initialPlan, newPlan)
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -106,6 +107,10 @@ func (e *CodexExecutor) Run(ctx context.Context, prompt string) Result {
 	sandbox := e.Sandbox
 	if sandbox == "" {
 		sandbox = "read-only"
+	}
+	// disable sandbox in docker (landlock doesn't work in containers)
+	if os.Getenv("RALPHEX_DOCKER") == "1" {
+		sandbox = "danger-full-access"
 	}
 
 	args := []string{

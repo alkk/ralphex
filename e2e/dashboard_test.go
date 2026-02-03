@@ -252,7 +252,7 @@ func TestKeyboardShortcutHelp(t *testing.T) {
 		require.NoError(t, err)
 
 		// wait for help overlay to appear
-		waitVisible(t, page, "#help-overlay", float64(pollTimeout / time.Millisecond))
+		waitVisible(t, page, "#help-overlay", float64(pollTimeout/time.Millisecond))
 
 		// verify modal content
 		modal := page.Locator(".help-modal")
@@ -265,14 +265,14 @@ func TestKeyboardShortcutHelp(t *testing.T) {
 		// open help first
 		err := page.Keyboard().Press("?")
 		require.NoError(t, err)
-		waitVisible(t, page, "#help-overlay", float64(pollTimeout / time.Millisecond))
+		waitVisible(t, page, "#help-overlay", float64(pollTimeout/time.Millisecond))
 
 		// press Escape to close
 		err = page.Keyboard().Press("Escape")
 		require.NoError(t, err)
 
 		// wait for overlay to be hidden
-		waitHidden(t, page, "#help-overlay", float64(pollTimeout / time.Millisecond))
+		waitHidden(t, page, "#help-overlay", float64(pollTimeout/time.Millisecond))
 	})
 }
 
