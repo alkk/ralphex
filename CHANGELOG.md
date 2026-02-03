@@ -1,10 +1,17 @@
 # Changelog
 
+## v0.7.4 - 2026-02-03
+
+### Fixed
+
+- Docker image tags now use semver format (0.7.4, 0.7, latest) without v prefix
+- Go image build now correctly references base image tag
+
 ## v0.7.3 - 2026-02-03
 
 ### Fixed
 
-- Docker image tags now use semver format (0.7.3, 0.7, latest) without v prefix
+- Docker image tags now use semver format (0.7.3, 0.7, latest) without v prefix (broken release)
 
 ## v0.7.2 - 2026-02-03
 

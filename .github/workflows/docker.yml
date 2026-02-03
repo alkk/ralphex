@@ -189,7 +189,11 @@ jobs:
         id: base
         run: |
           branch="${{ github.event.workflow_run.head_branch }}"
-          echo "tag=${branch}" >> $GITHUB_OUTPUT
+          if [[ "$branch" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "tag=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${branch}" >> $GITHUB_OUTPUT
+          fi
 
       - name: build and push go image by digest
         id: build
