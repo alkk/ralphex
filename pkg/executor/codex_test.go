@@ -199,7 +199,7 @@ func TestCodexExecutor_Run_DefaultSettings(t *testing.T) {
 
 	// verify default settings
 	argsStr := strings.Join(capturedArgs, " ")
-	assert.Contains(t, argsStr, `model="gpt-5.2-codex"`)
+	assert.Contains(t, argsStr, `model="gpt-5.3-codex"`)
 	assert.Contains(t, argsStr, "model_reasoning_effort=xhigh")
 	assert.Contains(t, argsStr, "stream_idle_timeout_ms=3600000")
 	assert.Contains(t, argsStr, "--sandbox read-only")

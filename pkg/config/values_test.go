@@ -25,7 +25,7 @@ func TestValuesLoader_Load_EmbeddedOnly(t *testing.T) {
 	assert.True(t, values.CodexEnabled)
 	assert.True(t, values.CodexEnabledSet)
 	assert.Equal(t, "codex", values.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", values.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", values.CodexModel)
 	assert.Equal(t, "xhigh", values.CodexReasoningEffort)
 	assert.Equal(t, 3600000, values.CodexTimeoutMs)
 	assert.Equal(t, "read-only", values.CodexSandbox)
@@ -62,7 +62,7 @@ iteration_delay_ms = 5000
 	// values from embedded (not set in global)
 	assert.True(t, values.CodexEnabled)
 	assert.Equal(t, "codex", values.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", values.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", values.CodexModel)
 	assert.Equal(t, "docs/plans", values.PlansDir)
 }
 
@@ -627,7 +627,7 @@ func TestValuesLoader_Load_AllCommentedConfigFallsBackToEmbedded(t *testing.T) {
 	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", values.ClaudeArgs)
 	assert.True(t, values.CodexEnabled)
 	assert.Equal(t, "codex", values.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", values.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", values.CodexModel)
 	assert.Equal(t, "docs/plans", values.PlansDir)
 }
 

@@ -194,7 +194,7 @@ func TestLoad_PartialConfig(t *testing.T) {
 	assert.Equal(t, "claude", cfg.ClaudeCommand)
 	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", cfg.ClaudeArgs)
 	assert.Equal(t, "codex", cfg.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", cfg.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", cfg.CodexModel)
 	assert.Equal(t, "xhigh", cfg.CodexReasoningEffort)
 	assert.Equal(t, "read-only", cfg.CodexSandbox)
 	assert.Equal(t, 2000, cfg.IterationDelayMs)
@@ -220,7 +220,7 @@ func TestLoad_EmptyConfig(t *testing.T) {
 	assert.Equal(t, "claude", cfg.ClaudeCommand)
 	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", cfg.ClaudeArgs)
 	assert.Equal(t, "codex", cfg.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", cfg.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", cfg.CodexModel)
 	assert.Equal(t, "xhigh", cfg.CodexReasoningEffort)
 	assert.Equal(t, "read-only", cfg.CodexSandbox)
 	assert.Equal(t, "docs/plans", cfg.PlansDir)
@@ -651,7 +651,7 @@ color_task = #0000ff
 	// embedded defaults (not in global or local)
 	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", cfg.ClaudeArgs)
 	assert.Equal(t, "codex", cfg.CodexCommand)
-	assert.Equal(t, "gpt-5.2-codex", cfg.CodexModel)
+	assert.Equal(t, "gpt-5.3-codex", cfg.CodexModel)
 
 	// --- verify colors merge chain ---
 	// local override
