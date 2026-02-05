@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.8.0 - 2026-02-05
+
+### Added
+
+- Custom external review support - use your own AI tool instead of codex (#67)
+- Finalize step for optional post-completion actions (#63)
+- Diff stats in completion message - shows files and lines changed (#66)
+- Cursor CLI documented as community-tested alternative
+
+### Changed
+
+- Default codex model updated to gpt-5.3-codex
+- `--external-only` (`-e`) flag replaces `--codex-only` (`-c` kept as deprecated alias)
+
+### Fixed
+
+- Strengthen codex eval prompt to prevent premature signal
+- Classify custom review sections as external phase in dashboard
+- Make config mount writable for default generation
+- Add API Error pattern to default error detection
+
 ## v0.7.5 - 2026-02-03
 
 ### Fixed
