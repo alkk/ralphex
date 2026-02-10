@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.10.1 - 2026-02-10
+
+### Changed
+
+- Clarify Docker image usage for non-Go languages in README
+
+### Fixed
+
+- Resolve version as unknown when installed via `go install` (#84)
+- Map RALPHEX_PORT to host side only, keep container port 8080
+- Resolve mypy strict type errors in docker wrapper script
+
 ## v0.10.0 - 2026-02-10
 
 ### Added
