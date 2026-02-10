@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.10.0 - 2026-02-10
+
+### Added
+
+- Model customization — per-phase config (`claude_model_task`, `claude_model_review`, `claude_model_plan`) and per-agent frontmatter options (`model`, `agent` type) in agent files (#75, #80) @ZhilinS
+- External git backend — use native git CLI instead of go-git via `git_backend = external` config (#79)
+- `CLAUDE_CONFIG_DIR` env var for alternate Claude config directories (#81)
+
+### Changed
+
+- Rewrite Docker wrapper script from bash to Python3 with embedded tests (#81)
+- Refactor PhaseHolder as single source of truth for execution phase (#75) @ZhilinS
+- Move IsMainBranch from backend interface to Service level
+- Use precise elapsed time formatting instead of coarse humanize.RelTime, drop go-humanize dependency
+- Update all dependencies to latest versions
+
+### Fixed
+
+- Web dashboard: diff stats display, session replay timing, watcher improvements, active task highlighting (#76) @melonamin
+- Docker: mount main .git dir for worktree support
+- Docker wrapper: preserve symlinked PWD, add urlopen timeout, remove dead code branch
+
 ## v0.9.0 - 2026-02-06
 
 ### Added
