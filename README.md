@@ -753,6 +753,14 @@ Ralphex commits after each completed task. If execution fails, completed tasks a
 
 Completed tasks are already committed to the feature branch. To resume, re-run `ralphex docs/plans/<plan>.md`. Ralphex detects completed tasks via `[x]` checkboxes in the plan and continues from the first incomplete task. For review sessions, simply restart. Reviews re-run from iteration 1, but fixes from previous iterations remain in the codebase.
 
+**Can I adjust the plan or change direction while ralphex is running?**
+
+Yes, two approaches depending on the situation:
+
+1. **Edit CLAUDE.md** — for behavioral changes (coding style, libraries, constraints). Each task runs in a fresh Claude Code session that reads CLAUDE.md at startup, so changes take effect on the next task or iteration automatically. No need to stop ralphex.
+
+2. **Stop, edit plan, re-run** — for structural changes (reorder tasks, add/remove tasks, change requirements). Press Ctrl+C to stop, edit the plan file (uncheck `[x]` → `[ ]` to redo tasks, add new tasks, modify descriptions), then re-run `ralphex docs/plans/<plan>.md`. Ralphex picks up from the first incomplete task and adapts to the updated plan.
+
 **What's the difference between progress file and plan file?**
 
 Progress file (`progress-*.txt`) is a real-time execution log—tail it to monitor. Plan file tracks task state (`[ ]` vs `[x]`). To resume, re-run ralphex on the plan file; it finds incomplete tasks automatically.
