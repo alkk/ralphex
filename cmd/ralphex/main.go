@@ -139,11 +139,12 @@ func main() {
 
 func run(ctx context.Context, o opts) error {
 	// suppress ^C echo in terminal before setting up interrupt watcher
-	defer disableCtrlCEcho()()
+	restoreTerminal := disableCtrlCEcho()
+	defer restoreTerminal()
 
 	// print immediate feedback when context is canceled (Ctrl+C).
 	// returned cleanup ensures goroutine exits when run() returns, avoiding leaks in tests.
-	defer startInterruptWatcher(ctx)()
+	defer startInterruptWatcher(ctx, restoreTerminal)()
 
 	// validate conflicting flags
 	if err := validateFlags(o); err != nil {
@@ -683,8 +684,9 @@ func isResetOnly(o opts) bool {
 
 // startInterruptWatcher prints immediate feedback when context is canceled.
 // if graceful shutdown doesn't complete within 5 seconds, force exits.
+// cleanup, if not nil, is called only on the force-exit (5s timeout) path before os.Exit.
 // returns a cleanup function that must be called (via defer) to prevent goroutine leaks.
-func startInterruptWatcher(ctx context.Context) func() {
+func startInterruptWatcher(ctx context.Context, cleanup func()) func() {
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -693,6 +695,9 @@ func startInterruptWatcher(ctx context.Context) func() {
 			select {
 			case <-time.After(5 * time.Second):
 				fmt.Fprintf(os.Stderr, "force exit\n")
+				if cleanup != nil {
+					cleanup()
+				}
 				os.Exit(1)
 			case <-done:
 			}
