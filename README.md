@@ -133,6 +133,29 @@ See [Custom External Review](#custom-external-review) for details on using custo
 
 *Second review agents are configurable via `prompts/review_second.txt`.*
 
+### Review-Only Mode
+
+Review-only mode (`--review`) runs the full review pipeline (Phase 2 → Phase 3 → Phase 4) on changes already present on the current branch. This is useful when changes were made outside ralphex — via Claude Code's built-in plan mode, manual edits, other AI agents, or any other workflow.
+
+**Workflow:**
+
+1. Make changes on a feature branch (using any tool or workflow)
+2. Commit the changes
+3. Run `ralphex --review`
+
+ralphex compares the branch against the default branch (`git diff master...HEAD`), launches multi-agent reviews, and iterates fixes until all agents report clean. No plan file is required — if provided, it gives reviewers additional context about the intended changes.
+
+```bash
+# switch to feature branch with existing changes
+git checkout feature-auth
+
+# run review pipeline on those changes
+ralphex --review
+
+# optionally pass a plan file for context
+ralphex --review docs/plans/add-auth.md
+```
+
 ### Plan Creation
 
 Plans can be created in several ways:
@@ -723,7 +746,7 @@ Codex is optional. If not installed, the codex review phase is skipped automatic
 
 **Can I run just reviews without task execution?**
 
-Yes, use `--review` flag. See [CLI Options](#cli-options).
+Yes, use `--review` flag to run the full review pipeline (Phase 2 → Phase 3 → Phase 4) on changes already on the current branch. This works for changes made by any tool — Claude Code's built-in mode, manual edits, other agents, etc. Switch to the feature branch, commit your changes, and run `ralphex --review`. See [Review-Only Mode](#review-only-mode) for details.
 
 **Can I run ralphex in a non-git directory?**
 

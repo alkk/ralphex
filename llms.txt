@@ -25,8 +25,10 @@ ralphex docs/plans/feature.md
 # select plan with fzf, or create one interactively if none exist
 ralphex
 
-# review-only mode (skip task execution)
-ralphex --review docs/plans/feature.md
+# review-only mode — run multi-agent reviews on existing branch changes
+# works for changes made by any tool (Claude Code, manual edits, other agents)
+ralphex --review
+ralphex --review docs/plans/feature.md  # optional plan file for context
 
 # external-only mode (skip tasks and first claude review, run only external review)
 ralphex --external-only
