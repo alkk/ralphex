@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.5 - 2026-02-12
+
+### Changed
+
+- Document review-only mode as standalone workflow
+
+### Fixed
+
+- Preserve markdown headers in prompt and agent files (#90)
+
 ## v0.10.4 - 2026-02-11
 
 ### Changed
