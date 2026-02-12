@@ -83,6 +83,8 @@ prep_site:
 	rm -rf site/site && mkdir -p site/site
 	cp -fv site/docs/index.html site/site/
 	cp -fv site/docs/favicon.png site/site/
+	cp -fv site/docs/robots.txt site/site/
+	cp -fv site/docs/sitemap.xml site/site/
 	cp -rv assets site/site/
 	cp -fv llms.txt site/site/
 	# build mkdocs into site/site/docs/

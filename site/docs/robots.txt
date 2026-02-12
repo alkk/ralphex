@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ralphex.com/sitemap.xml
+Sitemap: https://ralphex.com/docs/sitemap.xml
