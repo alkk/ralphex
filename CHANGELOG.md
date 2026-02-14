@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.12.0 - 2026-02-14
+
+### Added
+
+- `--dump-defaults` flag and `/ralphex-update` skill (#109)
+- Move progress files to `.ralphex/progress/` directory (#107)
+
+### Improved
+
+- Upgrade to go 1.26 and update dependencies
+
+### Fixed
+
+- Prevent progress file leakage from tests
+
 ## v0.11.1 - 2026-02-13
 
 ### Improved
