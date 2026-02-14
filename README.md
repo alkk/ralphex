@@ -310,7 +310,7 @@ Two images are published:
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Go | 1.25.6 | Go compiler and runtime |
+| Go | 1.26.0 | Go compiler and runtime |
 | golangci-lint | latest | Go linter |
 | moq | latest | Mock generator |
 | goimports | latest | Import formatter |
@@ -326,7 +326,7 @@ RALPHEX_IMAGE=ghcr.io/umputun/ralphex-go:latest ralphex docs/plans/feature.md
 FROM ghcr.io/umputun/ralphex:latest
 
 # install go from official distribution
-ARG GO_VERSION=1.25.6
+ARG GO_VERSION=1.26.0
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
     wget -qO- "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" | tar -xz -C /usr/local
 

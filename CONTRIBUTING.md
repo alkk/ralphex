@@ -3,7 +3,7 @@
 ## Development Setup
 
 1. Clone the repository
-2. Install Go 1.25+
+2. Install Go 1.26+
 3. Run `make test` to verify setup
 
 ## Code Style
