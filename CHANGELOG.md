@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.12.1 - 2026-02-15
+
+### Fixed
+
+- Add SELinux support for Docker volume mounts (#111)
+- Use Setsid instead of Setpgid to prevent terminal signal hang (#110)
+
 ## v0.12.0 - 2026-02-14
 
 ### Added
