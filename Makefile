@@ -78,6 +78,7 @@ prep_site:
 	cp -fv README.md site/docs-src/index.md
 	cp -rv assets site/docs-src/
 	grep -v -E 'badge|coveralls|goreportcard' site/docs-src/index.md > site/docs-src/index.md.tmp && mv site/docs-src/index.md.tmp site/docs-src/index.md
+	sed 's|](llms.txt)|](/llms.txt)|g' site/docs-src/index.md > site/docs-src/index.md.tmp && mv site/docs-src/index.md.tmp site/docs-src/index.md
 	mkdir -p site/docs-src/stylesheets && cp -fv site/docs/stylesheets/extra.css site/docs-src/stylesheets/
 	# build site structure: landing page + docs subdirectory
 	rm -rf site/site && mkdir -p site/site

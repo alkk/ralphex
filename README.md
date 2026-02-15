@@ -78,7 +78,7 @@ ralphex will create a branch, execute tasks, commit results, run multi-phase rev
 
 ## How It Works
 
-ralphex executes plans in four phases with automated code reviews.
+ralphex executes plans in four phases with automated code reviews, plus an optional finalize step.
 
 <details markdown>
 <summary>Execution Flow Diagram</summary>
@@ -132,6 +132,26 @@ See [Custom External Review](#custom-external-review) for details on using custo
 4. Moves plan to `completed/` folder on success
 
 *Second review agents are configurable via `prompts/review_second.txt`.*
+
+### Finalize Step (optional)
+
+After all review phases complete successfully, ralphex can run an optional finalize step. Disabled by default.
+
+**What it does:** runs a single Claude Code session with a customizable prompt. The default `finalize.txt` prompt rebases commits onto the default branch and optionally squashes related commits into logical groups.
+
+**How to enable:**
+
+Set `finalize_enabled = true` in `~/.config/ralphex/config` or `.ralphex/config`.
+
+**Behavior:**
+- Runs once (no iteration loop)
+- Best-effort — failures are logged but don't block success
+- Triggers on modes with review pipeline: full, review-only, external-only
+- Uses task color (green) for output
+
+**Customization:**
+
+Edit `~/.config/ralphex/prompts/finalize.txt` (or `.ralphex/prompts/finalize.txt`) to change what happens after reviews. Examples: push to remote, send notifications, run deployment scripts, or any post-completion automation. Template variables like `{{DEFAULT_BRANCH}}` are available.
 
 ### Review-Only Mode
 
