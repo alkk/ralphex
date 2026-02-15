@@ -21,6 +21,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import unittest.mock
 from pathlib import Path
 from types import FrameType
 from typing import Optional
@@ -29,6 +30,13 @@ from urllib.request import urlopen
 DEFAULT_IMAGE = "ghcr.io/umputun/ralphex-go:latest"
 DEFAULT_PORT = "8080"
 SCRIPT_URL = "https://raw.githubusercontent.com/umputun/ralphex/master/scripts/ralphex-dk.sh"
+
+
+def selinux_enabled() -> bool:
+    """check if SELinux is enabled (Linux only). Returns True when SELinux is active (enforcing or permissive)."""
+    if platform.system() != "Linux":
+        return False
+    return Path("/sys/fs/selinux/enforce").exists()
 
 
 def resolve_path(path: Path) -> Path:
@@ -186,9 +194,15 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
     if claude_home is None:
         claude_home = home / ".claude"
     vols: list[str] = []
+    selinux = selinux_enabled()
 
     def add(src: Path, dst: str, ro: bool = False) -> None:
-        suffix = ":ro" if ro else ""
+        opts: list[str] = []
+        if ro:
+            opts.append("ro")
+        if selinux:
+            opts.append("z")
+        suffix = ":" + ",".join(opts) if opts else ""
         vols.extend(["-v", f"{src}:{dst}{suffix}"])
 
     def add_symlink_targets(src: Path) -> None:
@@ -571,28 +585,38 @@ def run_tests() -> None:
 
     class TestBuildVolumes(unittest.TestCase):
         def test_volume_pairs(self) -> None:
-            vols = build_volumes(None)
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                vols = build_volumes(None)
             # volumes should come in -v pairs
             for i in range(0, len(vols), 2):
                 self.assertEqual(vols[i], "-v")
                 self.assertIn(":", vols[i + 1])
 
-        def test_includes_workspace(self) -> None:
-            vols = build_volumes(None)
-            pwd_env = os.environ.get("PWD")
-            cwd = Path(pwd_env) if pwd_env else Path(os.getcwd())
-            workspace_mount = f"{cwd}:/workspace"
-            self.assertIn(workspace_mount, vols)
+        def test_includes_workspace_without_selinux(self) -> None:
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                vols = build_volumes(None)
+                pwd_env = os.environ.get("PWD")
+                cwd = Path(pwd_env) if pwd_env else Path(os.getcwd())
+                self.assertIn(f"{cwd}:/workspace", vols)
 
-        def test_includes_claude_dir(self) -> None:
-            vols = build_volumes(None)
-            # find the claude mount
-            found = False
-            for v in vols:
-                if "/mnt/claude:ro" in v:
-                    found = True
-                    break
-            self.assertTrue(found, "should mount ~/.claude to /mnt/claude:ro")
+        def test_includes_workspace_with_selinux(self) -> None:
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=True):
+                vols = build_volumes(None)
+                pwd_env = os.environ.get("PWD")
+                cwd = Path(pwd_env) if pwd_env else Path(os.getcwd())
+                self.assertIn(f"{cwd}:/workspace:z", vols)
+
+        def test_includes_claude_dir_without_selinux(self) -> None:
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                vols = build_volumes(None)
+                found = any("/mnt/claude:ro" in v for v in vols)
+                self.assertTrue(found, "should mount ~/.claude to /mnt/claude:ro")
+
+        def test_includes_claude_dir_with_selinux(self) -> None:
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=True):
+                vols = build_volumes(None)
+                found = any("/mnt/claude:ro,z" in v for v in vols)
+                self.assertTrue(found, "should mount ~/.claude to /mnt/claude:ro,z")
 
     class TestDetectGitWorktree(unittest.TestCase):
         def test_regular_dir(self) -> None:
@@ -649,14 +673,28 @@ def run_tests() -> None:
             schedule_cleanup(None)
 
     class TestBuildDockerCmd(unittest.TestCase):
-        def test_creds_volume_mount(self) -> None:
+        def test_creds_volume_mount_without_selinux(self) -> None:
             """build_volumes should include creds temp mount when provided."""
             fd, tmp_path = tempfile.mkstemp()
             os.close(fd)
             try:
                 creds = Path(tmp_path)
-                vols = build_volumes(creds)
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols = build_volumes(creds)
                 mount = f"{creds}:/mnt/claude-credentials.json:ro"
+                self.assertIn(mount, vols)
+            finally:
+                os.unlink(tmp_path)
+
+        def test_creds_volume_mount_with_selinux(self) -> None:
+            """build_volumes should include creds temp mount with :ro,z when SELinux is active."""
+            fd, tmp_path = tempfile.mkstemp()
+            os.close(fd)
+            try:
+                creds = Path(tmp_path)
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=True):
+                    vols = build_volumes(creds)
+                mount = f"{creds}:/mnt/claude-credentials.json:ro,z"
                 self.assertIn(mount, vols)
             finally:
                 os.unlink(tmp_path)
@@ -691,26 +729,37 @@ def run_tests() -> None:
             self.assertEqual(keychain_service_name(Path("~/.claude")), "Claude Code-credentials")
 
     class TestBuildVolumesClaudeHome(unittest.TestCase):
-        def test_custom_claude_home_mount(self) -> None:
+        def test_custom_claude_home_mount_without_selinux(self) -> None:
             """build_volumes with custom claude_home mounts that dir to /mnt/claude:ro."""
             tmp = Path(tempfile.mkdtemp()).resolve()
             try:
                 custom = tmp / "my-claude"
                 custom.mkdir()
-                vols = build_volumes(None, claude_home=custom)
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols = build_volumes(None, claude_home=custom)
                 mount = f"{custom}:/mnt/claude:ro"
+                self.assertIn(mount, vols)
+            finally:
+                shutil.rmtree(tmp)
+
+        def test_custom_claude_home_mount_with_selinux(self) -> None:
+            """build_volumes with custom claude_home mounts that dir to /mnt/claude:ro,z."""
+            tmp = Path(tempfile.mkdtemp()).resolve()
+            try:
+                custom = tmp / "my-claude"
+                custom.mkdir()
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=True):
+                    vols = build_volumes(None, claude_home=custom)
+                mount = f"{custom}:/mnt/claude:ro,z"
                 self.assertIn(mount, vols)
             finally:
                 shutil.rmtree(tmp)
 
         def test_default_claude_home_when_none(self) -> None:
             """build_volumes with claude_home=None defaults to ~/.claude."""
-            vols = build_volumes(None)
-            found = False
-            for v in vols:
-                if "/mnt/claude:ro" in v:
-                    found = True
-                    break
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                vols = build_volumes(None)
+            found = any("/mnt/claude:ro" in v for v in vols)
             self.assertTrue(found, "should mount default claude dir to /mnt/claude:ro")
 
     class TestExtractCredentialsClaudeHome(unittest.TestCase):
@@ -734,6 +783,47 @@ def run_tests() -> None:
                 self.assertIsNone(extract_macos_credentials(tmp))
             finally:
                 shutil.rmtree(tmp)
+
+    class TestSelinuxEnabled(unittest.TestCase):
+        def test_returns_false_on_non_linux(self) -> None:
+            """selinux_enabled returns False on non-Linux."""
+            with unittest.mock.patch(f"{__name__}.platform") as mock_platform:
+                mock_platform.system.return_value = "Darwin"
+                self.assertFalse(selinux_enabled())
+
+        def test_returns_false_when_enforce_missing(self) -> None:
+            """selinux_enabled returns False when /sys/fs/selinux/enforce does not exist."""
+            with unittest.mock.patch(f"{__name__}.platform") as mock_platform, \
+                 unittest.mock.patch(f"{__name__}.Path") as mock_path:
+                mock_platform.system.return_value = "Linux"
+                mock_path.return_value.exists.return_value = False
+                self.assertFalse(selinux_enabled())
+
+        def test_returns_true_when_enforce_exists(self) -> None:
+            """selinux_enabled returns True when /sys/fs/selinux/enforce exists."""
+            with unittest.mock.patch(f"{__name__}.platform") as mock_platform, \
+                 unittest.mock.patch(f"{__name__}.Path") as mock_path:
+                mock_platform.system.return_value = "Linux"
+                mock_path.return_value.exists.return_value = True
+                self.assertTrue(selinux_enabled())
+
+    class TestSelinuxVolumeSuffix(unittest.TestCase):
+        def test_z_label_in_volumes_when_selinux(self) -> None:
+            """volume mounts include :z label when SELinux is enabled."""
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=True):
+                vols = build_volumes(None)
+            for i in range(1, len(vols), 2):
+                has_z = vols[i].endswith(":z") or ",z" in vols[i]
+                self.assertTrue(has_z, f"volume {vols[i]} missing :z SELinux label")
+
+        def test_no_z_label_without_selinux(self) -> None:
+            """volume mounts omit :z label when SELinux is not enabled."""
+            with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                vols = build_volumes(None)
+            for i in range(1, len(vols), 2):
+                self.assertNotIn(",z", vols[i])
+                self.assertFalse(vols[i].endswith(":z"),
+                                 f"volume {vols[i]} should not have :z without SELinux")
 
     class TestClaudeConfigDirEnv(unittest.TestCase):
         def test_env_sets_claude_home(self) -> None:
@@ -791,7 +881,8 @@ def run_tests() -> None:
     for tc in [TestResolvePath, TestSymlinkTargetDirs, TestShouldBindPort, TestBuildVolumes,
                TestDetectGitWorktree, TestExtractCredentials, TestScheduleCleanup,
                TestBuildDockerCmd, TestKeychainServiceName, TestBuildVolumesClaudeHome,
-               TestExtractCredentialsClaudeHome, TestClaudeConfigDirEnv]:
+               TestExtractCredentialsClaudeHome, TestSelinuxEnabled, TestSelinuxVolumeSuffix,
+               TestClaudeConfigDirEnv]:
         suite.addTests(loader.loadTestsFromTestCase(tc))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
