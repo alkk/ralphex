@@ -108,6 +108,11 @@ task_retry_count = 1
 # default: docs/plans
 plans_dir = docs/plans
 
+# default_branch: override the auto-detected default branch used for code review
+# by default, ralphex detects the default branch from origin/HEAD or fallbacks to main/master,
+# set this to override for projects using non-standard branch names or Git flow
+# default_branch = dev
+
 # watch_dirs: directories to watch for progress files in dashboard mode
 # comma-separated list of paths, relative paths resolved from project root
 # if not specified, defaults to current working directory

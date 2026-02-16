@@ -199,8 +199,11 @@ func run(ctx context.Context, o opts) error {
 		return ensureErr
 	}
 
-	// detect default branch for prompt templates
-	defaultBranch := gitSvc.GetDefaultBranch()
+	// use configured default branch, or auto-detect from git
+	defaultBranch := cfg.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = gitSvc.GetDefaultBranch()
+	}
 
 	mode := determineMode(o)
 

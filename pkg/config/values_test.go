@@ -1137,6 +1137,66 @@ func TestValuesLoader_Load_LocalOverridesExternalReviewTool(t *testing.T) {
 	assert.Equal(t, "none", values.ExternalReviewTool)
 }
 
+func TestValuesLoader_Load_DefaultBranch(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	configContent := `default_branch = dev`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, "dev", values.DefaultBranch)
+}
+
+func TestValuesLoader_Load_DefaultBranch_Whitespace(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	// whitespace should be trimmed
+	configContent := `default_branch =   feature-branch   `
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, "feature-branch", values.DefaultBranch)
+}
+
+func TestValuesLoader_Load_LocalOverridesGlobalDefaultBranch(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalConfig := filepath.Join(tmpDir, "global")
+	localConfig := filepath.Join(tmpDir, "local")
+
+	require.NoError(t, os.WriteFile(globalConfig, []byte(`default_branch = main`), 0o600))
+	require.NoError(t, os.WriteFile(localConfig, []byte(`default_branch = dev`), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load(localConfig, globalConfig)
+	require.NoError(t, err)
+
+	assert.Equal(t, "dev", values.DefaultBranch)
+}
+
+func TestValues_mergeFrom_DefaultBranch(t *testing.T) {
+	t.Run("merge default branch", func(t *testing.T) {
+		dst := Values{DefaultBranch: "main"}
+		src := Values{DefaultBranch: "dev"}
+		dst.mergeFrom(&src)
+		assert.Equal(t, "dev", dst.DefaultBranch)
+	})
+
+	t.Run("empty source doesn't overwrite default branch", func(t *testing.T) {
+		dst := Values{DefaultBranch: "main"}
+		src := Values{DefaultBranch: ""}
+		dst.mergeFrom(&src)
+		assert.Equal(t, "main", dst.DefaultBranch)
+	})
+}
+
 func TestValues_mergeFrom_ExternalReviewFields(t *testing.T) {
 	t.Run("merge external review tool", func(t *testing.T) {
 		dst := Values{ExternalReviewTool: "codex"}
