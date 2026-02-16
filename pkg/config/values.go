@@ -35,6 +35,7 @@ type Values struct {
 	FinalizeEnabled      bool
 	FinalizeEnabledSet   bool // tracks if finalize_enabled was explicitly set
 	PlansDir             string
+	DefaultBranch        string   // override auto-detected default branch
 	WatchDirs            []string // directories to watch for progress files
 
 	// notification settings
@@ -241,6 +242,9 @@ func (vl *valuesLoader) parseValuesFromBytes(data []byte) (Values, error) {
 	if key, err := section.GetKey("plans_dir"); err == nil {
 		values.PlansDir = key.String()
 	}
+	if key, err := section.GetKey("default_branch"); err == nil {
+		values.DefaultBranch = strings.TrimSpace(key.String())
+	}
 
 	// watch directories (comma-separated)
 	if key, err := section.GetKey("watch_dirs"); err == nil {
@@ -332,6 +336,9 @@ func (dst *Values) mergeFrom(src *Values) {
 	}
 	if src.PlansDir != "" {
 		dst.PlansDir = src.PlansDir
+	}
+	if src.DefaultBranch != "" {
+		dst.DefaultBranch = src.DefaultBranch
 	}
 	if len(src.WatchDirs) > 0 {
 		dst.WatchDirs = src.WatchDirs
