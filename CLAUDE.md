@@ -48,6 +48,8 @@ docs/plans/         # plan files location
 - Progress logging to files
 - Progress file locking (flock) for active session detection
 - Multiple execution modes: full, tasks-only, review-only, external-only/codex-only, plan creation
+- `--base-ref` flag overrides default branch for review diffs (branch name or commit hash)
+- `--skip-finalize` flag disables finalize step for a single run
 - Custom external review support via scripts (wraps any AI tool)
 - Configuration via `~/.config/ralphex/` with embedded defaults
 - File watching for multi-session dashboard using fsnotify
@@ -166,6 +168,7 @@ GOOS=windows GOARCH=amd64 go build ./...
 - Precedence: CLI flags > local config > global config > embedded defaults
 - Custom prompts: `~/.config/ralphex/prompts/*.txt` or `.ralphex/prompts/*.txt`
 - Custom agents: `~/.config/ralphex/agents/*.txt` or `.ralphex/agents/*.txt`
+- `default_branch` config option: override auto-detected default branch for review diffs
 - Notification config: `notify_channels`, `notify_on_error`, `notify_on_complete`, `notify_timeout_ms`, plus channel-specific `notify_*` fields (see `docs/notifications.md`)
 
 ### Local Project Config (.ralphex/)
@@ -232,6 +235,7 @@ Implementation:
 - `{{PROGRESS_FILE}}` - path to progress log or fallback text
 - `{{GOAL}}` - human-readable goal (plan-based or branch comparison)
 - `{{DEFAULT_BRANCH}}` - detected default branch (main, master, origin/main, etc.), overridable via `--base-ref` CLI flag or `default_branch` config option
+- `{{DIFF_INSTRUCTION}}` - git diff command for current iteration (first: `git diff main...HEAD`, subsequent: `git diff`)
 - `{{agent:name}}` - expands to Task tool instructions for the named agent
 
 Variables are also expanded inside agent content, so custom agents can use `{{DEFAULT_BRANCH}}` etc.
