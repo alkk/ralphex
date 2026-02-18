@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.15.1 - 2026-02-18
+
+### Fixed
+
+- Append progress files on restart instead of truncating (#130) @umputun
+- Use rune-based truncation for external review summary to avoid corrupting multi-byte UTF-8 characters
+
 ## v0.15.0 - 2026-02-17
 
 ### Added
