@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.15.3 - 2026-02-20
+
+### Fixed
+
+- Stop embedding diff in parallel agent prompts to reduce launch latency (#141)
+- Extract separator constant, assert test cleanup errors
+
 ## v0.15.2 - 2026-02-18
 
 ### Improved
