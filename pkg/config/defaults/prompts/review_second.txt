@@ -32,6 +32,11 @@ Agents to launch:
 {{agent:quality}}
 {{agent:implementation}}
 
+Each agent prompt should be short — do NOT paste the diff into it. Instead, instruct each agent to:
+1. Run `git diff {{DEFAULT_BRANCH}}...HEAD` and `git diff --stat {{DEFAULT_BRANCH}}...HEAD` to get the changes
+2. Read the actual source files to review code in full context
+3. Report problems only - no positive observations
+
 Focus only on critical and major issues. Ignore style/minor issues.
 
 ## Step 3: Verify and Evaluate Findings

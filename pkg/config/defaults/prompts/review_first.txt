@@ -35,7 +35,10 @@ Agents to launch:
 {{agent:simplification}}
 {{agent:documentation}}
 
-Each agent prompt should include the diff and instruct: "Report problems only - no positive observations."
+Each agent prompt should be short — do NOT paste the diff into it. Instead, instruct each agent to:
+1. Run `git diff {{DEFAULT_BRANCH}}...HEAD` and `git diff --stat {{DEFAULT_BRANCH}}...HEAD` to get the changes
+2. Read the actual source files to review code in full context
+3. Report problems only - no positive observations
 
 ## Step 3: Collect, Verify, and Fix Findings
 
