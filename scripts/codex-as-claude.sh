@@ -10,9 +10,9 @@
 #   claude_args =
 #
 # environment variables:
-#   CODEX_MODEL   - codex model to use (default: codex default)
-#   CODEX_SANDBOX - sandbox mode (default: danger-full-access)
-#   CODEX_VERBOSE - set to 1 to include command execution output (default: 0)
+#   CODEX_MODEL          - codex model to use (default: codex default)
+#   CODEX_SANDBOX        - sandbox mode (default: danger-full-access)
+#   CODEX_VERBOSE        - set to 1 to include command execution output (default: 0)
 
 set -euo pipefail
 
@@ -38,9 +38,22 @@ fi
 CODEX_MODEL="${CODEX_MODEL:-}"
 CODEX_SANDBOX="${CODEX_SANDBOX:-danger-full-access}"
 
+is_review_prompt=0
+if [[ "$prompt" == *"<<<RALPHEX:REVIEW_DONE>>>"* ]]; then
+    is_review_prompt=1
+fi
+
+if [[ "$is_review_prompt" == "1" ]]; then
+    adapter_text=$'Ralphex review adapter for Codex:\n- Interpret review "Task tool" instructions using codex collaboration tools: spawn_agent, send_input, wait, close_agent.\n- Launch all requested review agents in parallel in one turn.\n- Wait for all spawned review agents before collecting findings and applying fixes.\n- Keep original review workflow and all <<<RALPHEX:...>>> signals unchanged.'
+    prompt="$adapter_text"$'\n\n'"$prompt"
+fi
+
 # build codex arguments
 codex_args=(exec --json --dangerously-bypass-approvals-and-sandbox -s "$CODEX_SANDBOX")
 [[ -n "$CODEX_MODEL" ]] && codex_args+=(-m "$CODEX_MODEL")
+if [[ "$is_review_prompt" == "1" ]]; then
+    codex_args+=(-c "features.multi_agent=true")
+fi
 codex_args+=("$prompt")
 
 # run codex with JSON output, translate events to claude stream-json format.
