@@ -5,6 +5,7 @@ usage: ralphex-dk.sh [ralphex-args]
 example: ralphex-dk.sh docs/plans/feature.md
 example: ralphex-dk.sh --serve docs/plans/feature.md
 example: ralphex-dk.sh --review
+example: ralphex-dk.sh -v /data:/mnt/data:ro docs/plans/feature.md
 example: ralphex-dk.sh --update         # pull latest docker image
 example: ralphex-dk.sh --update-script  # update this wrapper script
 """
@@ -75,6 +76,21 @@ def symlink_target_dirs(src: Path, maxdepth: int = 2) -> list[Path]:
                 except (OSError, RuntimeError):
                     continue
     return sorted(dirs)
+
+
+def extract_extra_volumes(args: list[str]) -> tuple[list[str], list[str]]:
+    """extract -v/--volume flags from args, return (extra_volumes, remaining_args)."""
+    extra: list[str] = []
+    remaining: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] in ("-v", "--volume") and i + 1 < len(args):
+            extra.extend(["-v", args[i + 1]])
+            i += 2
+        else:
+            remaining.append(args[i])
+            i += 1
+    return extra, remaining
 
 
 def should_bind_port(args: list[str]) -> bool:
@@ -256,6 +272,13 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
     if global_gitignore:
         add(resolve_path(global_gitignore), str(global_gitignore), ro=True)
 
+    # 11. extra user-defined volumes via RALPHEX_EXTRA_VOLUMES env var (comma-separated)
+    extra = os.environ.get("RALPHEX_EXTRA_VOLUMES", "")
+    for mount in extra.split(","):
+        mount = mount.strip()
+        if mount and ":" in mount:
+            vols.extend(["-v", mount])
+
     return vols
 
 
@@ -424,6 +447,9 @@ def main() -> int:
         script_path = Path(os.path.realpath(sys.argv[0]))
         return handle_update_script(script_path)
 
+    # extract -v/--volume flags (consumed by wrapper, not passed to ralphex)
+    cli_volumes, args = extract_extra_volumes(args)
+
     # resolve claude config directory
     claude_config_dir_env = os.environ.get("CLAUDE_CONFIG_DIR", "")
     if claude_config_dir_env:
@@ -462,6 +488,7 @@ def main() -> int:
     try:
         # build volumes
         volumes = build_volumes(creds_temp, claude_home)
+        volumes.extend(cli_volumes)
 
         if claude_config_dir_env:
             print(f"using claude config dir: {claude_home}", file=sys.stderr)
@@ -876,13 +903,99 @@ def run_tests() -> None:
                 else:
                     os.environ["CLAUDE_CONFIG_DIR"] = old
 
+    class TestExtraVolumes(unittest.TestCase):
+        def test_extra_volumes_added(self) -> None:
+            """RALPHEX_EXTRA_VOLUMES adds user-defined mounts."""
+            old = os.environ.get("RALPHEX_EXTRA_VOLUMES")
+            os.environ["RALPHEX_EXTRA_VOLUMES"] = "/tmp/a:/mnt/a:ro,/tmp/b:/mnt/b"
+            try:
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols = build_volumes(None)
+                self.assertIn("/tmp/a:/mnt/a:ro", vols)
+                self.assertIn("/tmp/b:/mnt/b", vols)
+            finally:
+                if old is None:
+                    os.environ.pop("RALPHEX_EXTRA_VOLUMES", None)
+                else:
+                    os.environ["RALPHEX_EXTRA_VOLUMES"] = old
+
+        def test_empty_extra_volumes_is_noop(self) -> None:
+            """empty RALPHEX_EXTRA_VOLUMES adds no extra mounts."""
+            old = os.environ.get("RALPHEX_EXTRA_VOLUMES")
+            os.environ.pop("RALPHEX_EXTRA_VOLUMES", None)
+            try:
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols = build_volumes(None)
+                base_count = len(vols)
+                os.environ["RALPHEX_EXTRA_VOLUMES"] = ""
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols2 = build_volumes(None)
+                self.assertEqual(len(vols), len(vols2))
+            finally:
+                if old is None:
+                    os.environ.pop("RALPHEX_EXTRA_VOLUMES", None)
+                else:
+                    os.environ["RALPHEX_EXTRA_VOLUMES"] = old
+
+        def test_invalid_entries_skipped(self) -> None:
+            """entries without ':' are silently skipped."""
+            old = os.environ.get("RALPHEX_EXTRA_VOLUMES")
+            os.environ["RALPHEX_EXTRA_VOLUMES"] = "badentry,/tmp/ok:/mnt/ok"
+            try:
+                with unittest.mock.patch(f"{__name__}.selinux_enabled", return_value=False):
+                    vols = build_volumes(None)
+                self.assertNotIn("badentry", vols)
+                self.assertIn("/tmp/ok:/mnt/ok", vols)
+            finally:
+                if old is None:
+                    os.environ.pop("RALPHEX_EXTRA_VOLUMES", None)
+                else:
+                    os.environ["RALPHEX_EXTRA_VOLUMES"] = old
+
+    class TestExtractExtraVolumes(unittest.TestCase):
+        def test_extracts_v_flag(self) -> None:
+            """'-v src:dst' is extracted from args."""
+            extra, remaining = extract_extra_volumes(["-v", "/a:/b", "plan.md"])
+            self.assertEqual(extra, ["-v", "/a:/b"])
+            self.assertEqual(remaining, ["plan.md"])
+
+        def test_extracts_volume_flag(self) -> None:
+            """'--volume src:dst' is extracted from args."""
+            extra, remaining = extract_extra_volumes(["--volume", "/a:/b", "plan.md"])
+            self.assertEqual(extra, ["-v", "/a:/b"])
+            self.assertEqual(remaining, ["plan.md"])
+
+        def test_multiple_volumes(self) -> None:
+            """multiple -v flags are all extracted."""
+            extra, remaining = extract_extra_volumes(["-v", "/a:/b", "-v", "/c:/d", "plan.md"])
+            self.assertEqual(extra, ["-v", "/a:/b", "-v", "/c:/d"])
+            self.assertEqual(remaining, ["plan.md"])
+
+        def test_no_volumes(self) -> None:
+            """args without -v pass through unchanged."""
+            extra, remaining = extract_extra_volumes(["--serve", "plan.md"])
+            self.assertEqual(extra, [])
+            self.assertEqual(remaining, ["--serve", "plan.md"])
+
+        def test_v_at_end_without_value(self) -> None:
+            """-v at end of args without a value is kept as remaining."""
+            extra, remaining = extract_extra_volumes(["plan.md", "-v"])
+            self.assertEqual(extra, [])
+            self.assertEqual(remaining, ["plan.md", "-v"])
+
+        def test_mixed_with_other_flags(self) -> None:
+            """-v interleaved with other flags."""
+            extra, remaining = extract_extra_volumes(["--serve", "-v", "/x:/y:ro", "plan.md"])
+            self.assertEqual(extra, ["-v", "/x:/y:ro"])
+            self.assertEqual(remaining, ["--serve", "plan.md"])
+
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     for tc in [TestResolvePath, TestSymlinkTargetDirs, TestShouldBindPort, TestBuildVolumes,
                TestDetectGitWorktree, TestExtractCredentials, TestScheduleCleanup,
                TestBuildDockerCmd, TestKeychainServiceName, TestBuildVolumesClaudeHome,
                TestExtractCredentialsClaudeHome, TestSelinuxEnabled, TestSelinuxVolumeSuffix,
-               TestClaudeConfigDirEnv]:
+               TestClaudeConfigDirEnv, TestExtraVolumes, TestExtractExtraVolumes]:
         suite.addTests(loader.loadTestsFromTestCase(tc))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
