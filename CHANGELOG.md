@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.16.0 - 2026-02-22
+
+### New Features
+
+- Add extra volume mount support to Docker wrapper (#142) @alkk
+
+### Fixed
+
+- Fix dashboard task numbering on mid-run plan edits (#147) @umputun
+- Adapt review prompts for codex multi-agent flow (#143) @krajcik
+
 ## v0.15.3 - 2026-02-20
 
 ### Fixed
