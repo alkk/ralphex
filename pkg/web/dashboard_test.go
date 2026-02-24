@@ -160,7 +160,7 @@ func TestSetupWatchMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	srvErrCh, watchErrCh, err := setupWatchMode(ctx, 0, []string{tmpDir})
+	srvErrCh, watchErrCh, err := setupWatchMode(ctx, 0, "", []string{tmpDir})
 	require.NoError(t, err)
 	assert.NotNil(t, srvErrCh)
 	assert.NotNil(t, watchErrCh)
@@ -286,5 +286,24 @@ func TestPrintWatchInfo(t *testing.T) {
 	colors := testColors()
 
 	// just verify it doesn't panic
-	printWatchInfo([]string{"/tmp", "/var"}, 8080, colors)
+	printWatchInfo([]string{"/tmp", "/var"}, 8080, "", colors)
+}
+
+func TestConnectHost(t *testing.T) {
+	tests := []struct {
+		host, want string
+	}{
+		{"", "localhost"},
+		{"0.0.0.0", "localhost"},
+		{"::", "localhost"},
+		{"::1", "localhost"},
+		{"127.0.0.1", "localhost"},
+		{"192.168.1.10", "192.168.1.10"},
+		{"myhost.local", "myhost.local"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			assert.Equal(t, tt.want, ConnectHost(tt.host))
+		})
+	}
 }

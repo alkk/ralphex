@@ -15,10 +15,20 @@ import (
 // serverStartupTimeout is the time to wait for server startup before assuming success.
 const serverStartupTimeout = 100 * time.Millisecond
 
+// ConnectHost returns the host to use in user-facing URLs.
+// maps wildcard and loopback addresses to localhost since those aren't connectable.
+func ConnectHost(host string) string {
+	if host == "" || host == "0.0.0.0" || host == "::" || host == "::1" || host == "127.0.0.1" {
+		return "localhost"
+	}
+	return host
+}
+
 // DashboardConfig holds configuration for dashboard initialization.
 type DashboardConfig struct {
 	BaseLog         Logger           // base progress logger
 	Port            int              // web server port
+	Host            string           // host/IP to bind to (default "127.0.0.1")
 	PlanFile        string           // path to plan file (empty for watch-only mode)
 	Branch          string           // current git branch
 	WatchDirs       []string         // CLI watch directories
@@ -29,6 +39,7 @@ type DashboardConfig struct {
 // Dashboard manages web server and file watching for progress monitoring.
 type Dashboard struct {
 	port            int
+	host            string
 	planFile        string
 	branch          string
 	baseLog         Logger
@@ -42,6 +53,7 @@ type Dashboard struct {
 func NewDashboard(cfg DashboardConfig, holder *status.PhaseHolder) *Dashboard {
 	return &Dashboard{
 		port:            cfg.Port,
+		host:            cfg.Host,
 		planFile:        cfg.PlanFile,
 		branch:          cfg.Branch,
 		baseLog:         cfg.BaseLog,
@@ -68,6 +80,7 @@ func (d *Dashboard) Start(ctx context.Context) (*BroadcastLogger, error) {
 
 	cfg := ServerConfig{
 		Port:     d.port,
+		Host:     d.host,
 		PlanName: planName,
 		Branch:   d.branch,
 		PlanFile: d.planFile,
@@ -134,7 +147,7 @@ func (d *Dashboard) Start(ctx context.Context) (*BroadcastLogger, error) {
 		}
 	}()
 
-	d.colors.Info().Printf("web dashboard: http://localhost:%d\n", d.port)
+	d.colors.Info().Printf("web dashboard: http://%s:%d\n", ConnectHost(d.host), d.port)
 	return broadcastLog, nil
 }
 
@@ -147,13 +160,13 @@ func (d *Dashboard) RunWatchOnly(ctx context.Context, dirs []string) error {
 	}
 
 	// setup server and watcher
-	srvErrCh, watchErrCh, err := setupWatchMode(ctx, d.port, dirs)
+	srvErrCh, watchErrCh, err := setupWatchMode(ctx, d.port, d.host, dirs)
 	if err != nil {
 		return err
 	}
 
 	// print startup info
-	printWatchInfo(dirs, d.port, d.colors)
+	printWatchInfo(dirs, d.port, d.host, d.colors)
 
 	// monitor for errors until shutdown
 	return monitorErrors(ctx, srvErrCh, watchErrCh, d.colors)
@@ -161,7 +174,7 @@ func (d *Dashboard) RunWatchOnly(ctx context.Context, dirs []string) error {
 
 // setupWatchMode creates and starts the web server and file watcher for watch-only mode.
 // returns error channels for monitoring both components.
-func setupWatchMode(ctx context.Context, port int, dirs []string) (chan error, chan error, error) {
+func setupWatchMode(ctx context.Context, port int, host string, dirs []string) (chan error, chan error, error) {
 	sm := NewSessionManager()
 	watcher, err := NewWatcher(dirs, sm)
 	if err != nil {
@@ -170,6 +183,7 @@ func setupWatchMode(ctx context.Context, port int, dirs []string) (chan error, c
 
 	serverCfg := ServerConfig{
 		Port:     port,
+		Host:     host,
 		PlanName: "(watch mode)",
 		Branch:   "",
 		PlanFile: "",
@@ -254,11 +268,11 @@ func monitorErrors(ctx context.Context, srvErrCh, watchErrCh chan error, colors 
 }
 
 // printWatchInfo prints startup information for watch-only mode.
-func printWatchInfo(dirs []string, port int, colors *progress.Colors) {
+func printWatchInfo(dirs []string, port int, host string, colors *progress.Colors) {
 	colors.Info().Printf("watch-only mode: monitoring %d directories\n", len(dirs))
 	for _, dir := range dirs {
 		colors.Info().Printf("  %s\n", dir)
 	}
-	colors.Info().Printf("web dashboard: http://localhost:%d\n", port)
+	colors.Info().Printf("web dashboard: http://%s:%d\n", ConnectHost(host), port)
 	colors.Info().Printf("press Ctrl+C to exit\n")
 }
