@@ -51,8 +51,8 @@ func (r *execClaudeRunner) Run(ctx context.Context, name string, args ...string)
 	// to ensure the entire process group is killed, not just the direct child
 	cmd := exec.Command(name, args...) //nolint:noctx // intentional: we handle context cancellation via process group kill
 
-	// filter out ANTHROPIC_API_KEY from environment (claude uses different auth)
-	cmd.Env = filterEnv(os.Environ(), "ANTHROPIC_API_KEY")
+	// filter out ANTHROPIC_API_KEY (claude uses different auth) and CLAUDECODE (prevents nested session errors)
+	cmd.Env = filterEnv(os.Environ(), "ANTHROPIC_API_KEY", "CLAUDECODE")
 
 	// create new process group so we can kill all descendants on cleanup
 	setupProcessGroup(cmd)
@@ -208,9 +208,13 @@ func (e *ClaudeExecutor) Run(ctx context.Context, prompt string) Result {
 		if ctx.Err() != nil {
 			return Result{Output: result.Output, Signal: result.Signal, Error: ctx.Err()}
 		}
-		// non-zero exit might still have useful output
 		if result.Output == "" {
 			return Result{Error: fmt.Errorf("claude exited with error: %w", err)}
+		}
+		// non-zero exit with output but no signal means claude failed without doing useful work.
+		// if there IS a signal, work was done — ignore exit code (some tasks exit non-zero after completion).
+		if result.Signal == "" {
+			result.Error = fmt.Errorf("claude exited with error: %w", err)
 		}
 	}
 

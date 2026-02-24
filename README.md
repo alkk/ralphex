@@ -686,7 +686,7 @@ Use `--config-dir` or `RALPHEX_CONFIG_DIR` to override the global config locatio
 | `color_signal` | Completion/failure signals color (hex) | `#ff6464` |
 | `color_timestamp` | Timestamp prefix color (hex) | `#8a8a8a` |
 | `color_info` | Informational messages color (hex) | `#b4b4b4` |
-| `claude_error_patterns` | Patterns to detect in claude output (comma-separated) | `You've hit your limit` |
+| `claude_error_patterns` | Patterns to detect in claude output (comma-separated) | `You've hit your limit,API Error:,cannot be launched inside another Claude Code session` |
 | `codex_error_patterns` | Patterns to detect in codex output (comma-separated) | `Rate limit,quota exceeded` |
 
 Colors use 24-bit RGB (true color), supported natively by all modern terminals (iTerm2, Kitty, Terminal.app, Windows Terminal, GNOME Terminal, Alacritty, Zed, VS Code, etc). Older terminals will degrade gracefully. Use `--no-color` to disable colors entirely.
@@ -996,7 +996,7 @@ Once installed:
 
 The `/ralphex` command runs ralphex in the background and provides status updates on request. The `/ralphex-plan` command guides you through creating well-structured plans with context discovery and approach selection.
 
-> **Note:** ralphex must be run from a regular terminal, not from inside Claude Code. Claude Code sets the `CLAUDECODE` env var to prevent nested sessions — child `claude` processes inherit it and refuse to start. The `/ralphex` skill is designed for launching from a standalone terminal session.
+> **Note:** ralphex automatically strips the `CLAUDECODE` env var from child processes, allowing it to run from inside Claude Code. However, running from a standalone terminal is still recommended for the best experience. If the nested session error is somehow encountered, ralphex detects it via error pattern matching and exits gracefully.
 
 ## For LLMs
 

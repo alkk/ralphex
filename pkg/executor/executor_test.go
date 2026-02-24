@@ -46,6 +46,7 @@ func TestClaudeExecutor_Run_StartError(t *testing.T) {
 }
 
 func TestClaudeExecutor_Run_WaitError_WithOutput(t *testing.T) {
+	// non-zero exit with output but no signal should propagate error
 	jsonStream := `{"type":"content_block_delta","delta":{"type":"text_delta","text":"partial output"}}`
 
 	mock := &mocks.CommandRunnerMock{
@@ -57,9 +58,27 @@ func TestClaudeExecutor_Run_WaitError_WithOutput(t *testing.T) {
 
 	result := e.Run(context.Background(), "test prompt")
 
-	// should have output despite error
-	require.NoError(t, result.Error)
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "claude exited with error")
 	assert.Equal(t, "partial output", result.Output)
+}
+
+func TestClaudeExecutor_Run_WaitError_WithOutputAndSignal(t *testing.T) {
+	// non-zero exit with output AND signal should ignore exit code (useful work was done)
+	jsonStream := `{"type":"content_block_delta","delta":{"type":"text_delta","text":"task done <<<RALPHEX:ALL_TASKS_DONE>>>"}}`
+
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
+			return strings.NewReader(jsonStream), func() error { return errors.New("exit status 1") }, nil
+		},
+	}
+	e := &ClaudeExecutor{cmdRunner: mock}
+
+	result := e.Run(context.Background(), "test prompt")
+
+	require.NoError(t, result.Error)
+	assert.Equal(t, "task done <<<RALPHEX:ALL_TASKS_DONE>>>", result.Output)
+	assert.Equal(t, "<<<RALPHEX:ALL_TASKS_DONE>>>", result.Signal)
 }
 
 func TestClaudeExecutor_Run_WaitError_NoOutput(t *testing.T) {
@@ -470,6 +489,12 @@ func TestFilterEnv(t *testing.T) {
 			remove: []string{"ANTHROPIC_API_KEY"},
 			want:   []string{"ANTHROPIC_API_KEY_OLD=secret"},
 		},
+		{
+			name:   "removes CLAUDECODE and ANTHROPIC_API_KEY together",
+			env:    []string{"PATH=/usr/bin", "CLAUDECODE=1", "ANTHROPIC_API_KEY=secret", "HOME=/home/user"},
+			remove: []string{"ANTHROPIC_API_KEY", "CLAUDECODE"},
+			want:   []string{"PATH=/usr/bin", "HOME=/home/user"},
+		},
 	}
 
 	for _, tc := range tests {
@@ -646,6 +671,54 @@ func TestClaudeExecutor_Run_ErrorPattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClaudeExecutor_Run_WaitError_WithOutputAndErrorPattern(t *testing.T) {
+	// non-zero exit + output matching error pattern → PatternMatchError takes precedence
+	jsonStream := "Error: Claude Code cannot be launched inside another Claude Code session.\n"
+
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
+			return strings.NewReader(jsonStream), func() error { return errors.New("exit status 1") }, nil
+		},
+	}
+	e := &ClaudeExecutor{
+		cmdRunner:     mock,
+		ErrorPatterns: []string{"cannot be launched inside another Claude Code session"},
+	}
+
+	result := e.Run(context.Background(), "test prompt")
+
+	require.Error(t, result.Error)
+	var patternErr *PatternMatchError
+	require.ErrorAs(t, result.Error, &patternErr)
+	assert.Equal(t, "cannot be launched inside another Claude Code session", patternErr.Pattern)
+	assert.Contains(t, result.Output, "cannot be launched inside another Claude Code session")
+	assert.Empty(t, result.Signal)
+}
+
+func TestClaudeExecutor_Run_WaitError_WithSignalAndErrorPattern(t *testing.T) {
+	// non-zero exit + output with signal + error pattern → PatternMatchError takes precedence (signal present skips exit error)
+	jsonStream := `{"type":"content_block_delta","delta":{"type":"text_delta","text":"You've hit your limit <<<RALPHEX:ALL_TASKS_DONE>>>"}}`
+
+	mock := &mocks.CommandRunnerMock{
+		RunFunc: func(_ context.Context, _ string, _ ...string) (io.Reader, func() error, error) {
+			return strings.NewReader(jsonStream), func() error { return errors.New("exit status 1") }, nil
+		},
+	}
+	e := &ClaudeExecutor{
+		cmdRunner:     mock,
+		ErrorPatterns: []string{"hit your limit"},
+	}
+
+	result := e.Run(context.Background(), "test prompt")
+
+	require.Error(t, result.Error)
+	var patternErr *PatternMatchError
+	require.ErrorAs(t, result.Error, &patternErr)
+	assert.Equal(t, "hit your limit", patternErr.Pattern)
+	assert.Contains(t, result.Output, "You've hit your limit")
+	assert.Equal(t, "<<<RALPHEX:ALL_TASKS_DONE>>>", result.Signal)
 }
 
 func TestClaudeExecutor_Run_ErrorPattern_WithSignal(t *testing.T) {

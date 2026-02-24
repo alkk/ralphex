@@ -35,7 +35,7 @@ func TestValuesLoader_Load_EmbeddedOnly(t *testing.T) {
 	assert.Equal(t, 1, values.TaskRetryCount)
 	assert.True(t, values.TaskRetryCountSet)
 	assert.Equal(t, "docs/plans", values.PlansDir)
-	assert.Equal(t, []string{"You've hit your limit", "API Error:"}, values.ClaudeErrorPatterns)
+	assert.Equal(t, []string{"You've hit your limit", "API Error:", "cannot be launched inside another Claude Code session"}, values.ClaudeErrorPatterns)
 	assert.Equal(t, []string{"Rate limit", "quota exceeded"}, values.CodexErrorPatterns)
 }
 
