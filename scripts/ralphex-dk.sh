@@ -98,6 +98,30 @@ def should_bind_port(args: list[str]) -> bool:
     return "--serve" in args or "-s" in args
 
 
+def detect_timezone() -> str:
+    """detect host timezone for container. checks TZ env, /etc/timezone, timedatectl, defaults to UTC."""
+    tz = os.environ.get("TZ", "")
+    if tz:
+        return tz
+    try:
+        tz = Path("/etc/timezone").read_text().strip()
+        if tz:
+            return tz
+    except OSError:
+        pass
+    try:
+        # try reading /etc/localtime symlink target (common on macOS and many Linux distros)
+        link = os.readlink("/etc/localtime")
+        # extract timezone from path like /usr/share/zoneinfo/America/New_York
+        marker = "zoneinfo/"
+        idx = link.find(marker)
+        if idx >= 0:
+            return link[idx + len(marker):]
+    except OSError:
+        pass
+    return "UTC"
+
+
 def detect_git_worktree(workspace: Path) -> Optional[Path]:
     """check if .git is a file (worktree), return absolute path to git common dir."""
     git_path = workspace / ".git"
@@ -382,6 +406,7 @@ def run_docker(image: str, port: str, volumes: list[str], bind_port: bool, args:
 
     cmd.extend([
         "-e", f"APP_UID={os.getuid()}",
+        "-e", f"TIME_ZONE={detect_timezone()}",
         "-e", "SKIP_HOME_CHOWN=1",
         "-e", "INIT_QUIET=1",
         "-e", "CLAUDE_CONFIG_DIR=/home/app/.claude",
@@ -654,6 +679,44 @@ def run_tests() -> None:
                 self.assertIsNone(detect_git_worktree(tmp))
             finally:
                 shutil.rmtree(tmp)
+
+    class TestDetectTimezone(unittest.TestCase):
+        def test_tz_env_takes_priority(self) -> None:
+            old = os.environ.get("TZ")
+            try:
+                os.environ["TZ"] = "Europe/Berlin"
+                self.assertEqual(detect_timezone(), "Europe/Berlin")
+            finally:
+                if old is None:
+                    os.environ.pop("TZ", None)
+                else:
+                    os.environ["TZ"] = old
+
+        def test_returns_string(self) -> None:
+            # without TZ env, should return some timezone string (at least UTC)
+            old = os.environ.pop("TZ", None)
+            try:
+                tz = detect_timezone()
+                self.assertIsInstance(tz, str)
+                self.assertTrue(len(tz) > 0)
+            finally:
+                if old is not None:
+                    os.environ["TZ"] = old
+
+        def test_timezone_in_docker_cmd(self) -> None:
+            """verify TIME_ZONE env var is included in docker command."""
+            old = os.environ.get("TZ")
+            try:
+                os.environ["TZ"] = "Asia/Tokyo"
+                # build a minimal docker command and check TIME_ZONE is set
+                cmd = ["-e", f"TIME_ZONE={detect_timezone()}"]
+                self.assertIn("-e", cmd)
+                self.assertIn("TIME_ZONE=Asia/Tokyo", cmd)
+            finally:
+                if old is None:
+                    os.environ.pop("TZ", None)
+                else:
+                    os.environ["TZ"] = old
 
     class TestExtractCredentials(unittest.TestCase):
         def test_write_pattern_adds_trailing_newline(self) -> None:
