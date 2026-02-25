@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.17.0 - 2026-02-24
+
+### New Features
+
+- Add git worktree isolation for parallel plan execution (#158) @umputun
+
+### Improved
+
+- Bump goreleaser/goreleaser-action from 6 to 7 (#148) @app/dependabot
+- Add codecov config to ignore mock directories
+- Replace coveralls with codecov for coverage reporting
+- Add worktree isolation documentation
+- Add coverage for worktree and ensureGitIgnored paths
+
+### Fixed
+
+- Make web dashboard reachable from host in Docker (#152) @nnemirovsky
+- Handle nested claude session error instead of silent loop
+- Auto-detect host timezone in Docker wrapper
+
 ## v0.16.0 - 2026-02-22
 
 ### New Features
