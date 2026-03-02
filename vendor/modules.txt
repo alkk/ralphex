@@ -49,7 +49,7 @@ github.com/clipperhouse/uax29/v2/graphemes
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/deckarep/golang-set/v2 v2.7.0
+# github.com/deckarep/golang-set/v2 v2.8.0
 ## explicit; go 1.18
 github.com/deckarep/golang-set/v2
 # github.com/dlclark/regexp2 v1.11.5
@@ -118,7 +118,7 @@ github.com/muesli/reflow/wordwrap
 # github.com/muesli/termenv v0.16.0
 ## explicit; go 1.17
 github.com/muesli/termenv
-# github.com/playwright-community/playwright-go v0.5200.1
+# github.com/playwright-community/playwright-go v0.5700.1
 ## explicit; go 1.22
 github.com/playwright-community/playwright-go
 github.com/playwright-community/playwright-go/internal/safe

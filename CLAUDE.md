@@ -15,6 +15,16 @@ make lint       # run golangci-lint
 make fmt        # format code
 ```
 
+### Updating Dependencies
+
+`go get -u ./...` does NOT update dependencies behind build tags. The `e2e/` package uses `//go:build e2e`, so playwright-go and other e2e-only deps require a separate update:
+
+```bash
+go get -u ./...                                          # update main deps
+go get -u -tags=e2e github.com/playwright-community/playwright-go  # update e2e deps
+go mod tidy && go mod vendor                             # tidy and re-vendor
+```
+
 ## Project Structure
 
 ```
