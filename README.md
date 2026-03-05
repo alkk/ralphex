@@ -807,7 +807,7 @@ notify_webhook_urls = https://hooks.example.com/notify
 
 Supported channels: `telegram`, `email`, `slack`, `webhook`, `custom` (script). Misconfigured channels are detected at startup.
 
-See [docs/notifications.md](docs/notifications.md) for setup guides, message format examples, and custom script integration.
+See [notifications documentation](https://github.com/umputun/ralphex/blob/master/docs/notifications.md) for setup guides, message format examples, and custom script integration.
 
 **Prompt customization:**
 
@@ -830,7 +830,7 @@ When running ralphex in Docker, your script must be accessible inside the contai
 
 The `claude_command` and `claude_args` config options let you replace Claude Code with any CLI that produces compatible `stream-json` output. This means codex, Gemini CLI, local LLMs, or any other tool can drive task execution and review phases — you just need a wrapper script that translates the tool's output format.
 
-A working example is included: [`scripts/codex-as-claude.sh`](scripts/codex-as-claude.sh) wraps codex to produce Claude-compatible events. To use it:
+A working example is included: [`scripts/codex-as-claude.sh`](https://github.com/umputun/ralphex/blob/master/scripts/codex-as-claude.sh) wraps codex to produce Claude-compatible events. To use it:
 
 ```ini
 # in ~/.config/ralphex/config or .ralphex/config
@@ -845,7 +845,7 @@ The wrapper supports environment variables:
 - `CODEX_SANDBOX` - sandbox mode (default: `danger-full-access`)
 - `CODEX_VERBOSE` - set to `1` to include command execution output in the stream (default: `0`, only agent messages are shown)
 
-See [docs/custom-providers.md](docs/custom-providers.md) for a detailed guide on writing wrappers for other providers.
+See [custom providers documentation](https://github.com/umputun/ralphex/blob/master/docs/custom-providers.md) for a detailed guide on writing wrappers for other providers.
 
 ### Configurable VCS Backend
 
@@ -856,9 +856,9 @@ ralphex can work with Mercurial repositories through the `vcs_command` config op
 vcs_command = ~/.config/ralphex/scripts/hg2git.sh
 ```
 
-A reference translation script is included at [`scripts/hg2git.sh`](scripts/hg2git.sh). It maps the ~15 git subcommands ralphex uses internally to Mercurial equivalents, with phase-based commit logic (amend on draft, commit on public). Requires bash 4.0+ (for associative arrays used in diff stats parsing).
+A reference translation script is included at [`scripts/hg2git.sh`](https://github.com/umputun/ralphex/blob/master/scripts/hg2git.sh). It maps the ~15 git subcommands ralphex uses internally to Mercurial equivalents, with phase-based commit logic (amend on draft, commit on public). Requires bash 4.0+ (for associative arrays used in diff stats parsing).
 
-You will also need to customise prompt files to replace git commands that Claude executes as bash commands during reviews. See [`docs/hg-support.md`](docs/hg-support.md) for full setup instructions, prompt replacement examples, `.hgignore` setup, and known limitations.
+You will also need to customise prompt files to replace git commands that Claude executes as bash commands during reviews. See [Mercurial support documentation](https://github.com/umputun/ralphex/blob/master/docs/hg-support.md) for full setup instructions, prompt replacement examples, `.hgignore` setup, and known limitations.
 
 <details markdown>
 <summary><b>FAQ</b></summary>
@@ -961,7 +961,7 @@ claude_command = /path/to/codex-as-claude.sh
 claude_args =
 ```
 
-Set `CODEX_MODEL` env var to choose the model. See [Using Alternative Providers](#using-alternative-providers-for-claude-phases) and [docs/custom-providers.md](docs/custom-providers.md) for writing wrappers for other tools.
+Set `CODEX_MODEL` env var to choose the model. See [Using Alternative Providers](#using-alternative-providers-for-claude-phases) and [custom providers documentation](https://github.com/umputun/ralphex/blob/master/docs/custom-providers.md) for writing wrappers for other tools.
 
 **How do I use multiple Claude accounts?**
 
