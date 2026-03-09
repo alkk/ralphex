@@ -729,7 +729,7 @@ Use `--config-dir` or `RALPHEX_CONFIG_DIR` to override the global config locatio
 | `claude_args` | Claude CLI arguments | `--dangerously-skip-permissions --output-format stream-json --verbose` |
 | `codex_enabled` | Enable codex review phase | `true` |
 | `codex_command` | Codex CLI command | `codex` |
-| `codex_model` | Codex model ID | `gpt-5.3-codex` |
+| `codex_model` | Codex model ID | `gpt-5.4` |
 | `codex_reasoning_effort` | Reasoning effort level | `xhigh` |
 | `codex_timeout_ms` | Codex timeout in ms | `3600000` |
 | `codex_sandbox` | Sandbox mode | `read-only` |

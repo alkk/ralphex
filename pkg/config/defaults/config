@@ -36,9 +36,9 @@ codex_enabled = true
 codex_command = codex
 
 # codex_model: model ID for codex
-# available models: gpt-5.3-codex, gpt-5.3-codex-mini, gpt-5.2-codex
-# default: gpt-5.3-codex
-codex_model = gpt-5.3-codex
+# available models: gpt-5.4, gpt-5.3-codex, gpt-5.3-codex-mini
+# default: gpt-5.4
+codex_model = gpt-5.4
 
 # codex_reasoning_effort: reasoning effort level for codex
 # available: low, medium, high, xhigh

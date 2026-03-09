@@ -62,7 +62,7 @@ func (r *execCodexRunner) Run(ctx context.Context, name string, args ...string) 
 // CodexExecutor runs codex CLI commands and filters output.
 type CodexExecutor struct {
 	Command         string            // command to execute, defaults to "codex"
-	Model           string            // model to use, defaults to gpt-5.3-codex
+	Model           string            // model to use, defaults to gpt-5.4
 	ReasoningEffort string            // reasoning effort level, defaults to "xhigh"
 	TimeoutMs       int               // stream idle timeout in ms, defaults to 3600000
 	Sandbox         string            // sandbox mode, defaults to "read-only"
@@ -91,7 +91,7 @@ func (e *CodexExecutor) Run(ctx context.Context, prompt string) Result {
 
 	model := e.Model
 	if model == "" {
-		model = "gpt-5.3-codex"
+		model = "gpt-5.4"
 	}
 
 	reasoningEffort := e.ReasoningEffort
