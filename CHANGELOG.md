@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.23.0 - 2026-03-16
+
+### New Features
+
+- Support host Docker socket mounting in container for Docker-dependent workflows #223 @umputun
+
+### Improved
+
+- Code smells cleanup: structure and convention improvements #217 @umputun
+- Bump golang.org/x/term from 0.40.0 to 0.41.0 #219 @app/dependabot
+- Bump github.com/charmbracelet/glamour from 0.10.0 to 1.0.0 #218 @app/dependabot
+
+### Fixed
+
+- Pass Claude prompt via stdin to avoid Windows cmd.exe length limit #220 @stanurkov
+
 ## v0.22.0 - 2026-03-15
 
 ### New Features
