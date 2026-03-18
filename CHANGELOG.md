@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.3 - 2026-03-18
+
+### Improved
+
+- Add RALPHEX_DOCKER_NETWORK env var and --network CLI flag #230 @umputun
+
+### Fixed
+
+- Prevent non-automatable checkboxes in plan Task sections #228 @umputun
+
 ## v0.24.2 - 2026-03-18
 
 ### Fixed
